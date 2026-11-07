@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2212%22 fill=%22%23151b20%22/%3E%3Ctext x=%2232%22 y=%2244%22 font-size=%2236%22 text-anchor=%22middle%22 fill=%22%23e6bb70%22%3EV%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#151b20">
+<title>VITA DISTRICT — prototipo</title>
+<link rel="stylesheet" href="./style.css">
+<script type="importmap">{"imports":{"three":"./vendor/three.module.min.js","three/addons/":"./vendor/jsm/"}}</script>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="touch"></div>
+<div id="joy" class="hidden"><div id="joyKnob"></div></div>
+
+<div id="hud">
+  <div id="hudLeft">
+    <div class="chip" id="money">120 crediti</div>
+    <div class="chip small" id="look">Capelli corti · barba ombra</div>
+    <div class="chip demo hidden" id="demoBadge">DEMO +0 gg</div>
+    <div class="chip small hidden" id="boost">☕ energia</div>
+  </div>
+  <div id="objective" class="hidden"></div>
+  <canvas id="mini" width="260" height="260" aria-label="Minimappa: tocca per aprire la mappa"></canvas>
+</div>
+<div id="topBtns">
+  <button id="btnMap" class="pill">🗺 Mappa</button>
+  <button id="btnMenu" class="pill">☰ Menu</button>
+</div>
+<button id="btnAct" class="act hidden">Interagisci</button>
+<div id="toast" class="hidden"></div>
+<div id="hint" class="hidden"><span id="hintText"></span><button id="hintNext" class="pill">Ok</button><button id="hintSkip" class="link">Salta guida</button></div>
+
+<!-- Mappa -->
+<div id="mapView" class="overlay hidden" role="dialog" aria-label="Mappa del Rione Marea">
+  <div class="mapHead"><b>Rione Marea</b><span class="muted"> · tocca un luogo per segnarlo</span>
+    <button id="mapCenter" class="pill">◎ Centra su di te</button><button id="mapClose" class="pill">✕ Chiudi</button></div>
+  <div id="mapWrap"><canvas id="bigMap"></canvas><div id="mapMarkers"></div></div>
+  <div id="mapCard" class="card hidden"></div>
+  <div class="legend muted">▲ Tu · ◆ destinazione · grigio scuro = edifici · azzurro = strade</div>
+</div>
+
+<!-- Pannello generico (barbiere, bar, consegne, dialoghi, menu, specchio) -->
+<div id="panel" class="overlay side hidden" role="dialog"><div id="panelBody"></div></div>
+<div id="confirm" class="overlay center hidden" role="alertdialog"><div class="card"><p id="confirmText"></p><div class="row"><button id="confirmNo" class="pill">Annulla</button><button id="confirmYes" class="pill danger">Conferma</button></div></div></div>
+
+<div id="loading"><div><h1>VITA DISTRICT</h1><p>Rione Marea · prototipo web 3D</p><p id="loadMsg" class="muted">Caricamento…</p></div></div>
+<noscript>Serve JavaScript per giocare.</noscript>
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>
