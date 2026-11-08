@@ -403,6 +403,20 @@ export const CARS = {
     vMax: 52, acc: 7.8, brake: 11, rev: 6, steer: 0.55, steerRate: 2.2, grip: 3.2, wb: 2.55, len: 4.25, wid: 1.88 },
 };
 export const CAR_HOME = { x: 8, z: 2.6, yaw: Math.PI / 2 }; // parcheggio di Via del Porto davanti alla piazza
+// Al primo aggiornamento da una partita v1/v2, segna l'autosalone se non c'è già una destinazione.
+// Non tocca i salvataggi che hanno già un waypoint, e non cancella altre chiavi.
+export function migrationGuide(state, status) {
+  if (status !== 'migrated' || !state || state.waypoint) return false;
+  state.waypoint = 'dealer';
+  return true;
+}
+export function playerCarMarker(state) {
+  const g = state && state.garage;
+  const spec = g && CARS[g.selected];
+  const c = g && g.car;
+  if (!spec || !c || !isNum(c.x) || !isNum(c.z)) return null;
+  return { id: 'mycar', name: `La tua ${spec.name}`, short: spec.name, icon: '🚙', x: c.x, z: c.z, color: spec.color, car: true };
+}
 export function buyCar(state, id) {
   const c = CARS[id]; if (!c || !Object.prototype.hasOwnProperty.call(CARS, id)) return { ok: false, reason: 'Modello sconosciuto.' };
   if (state.garage.owned.includes(id)) return { ok: false, reason: 'È già nel tuo garage.', owned: true };

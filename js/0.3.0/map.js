@@ -1,5 +1,6 @@
 // Mappa grande (marker cliccabili, waypoint) e minimappa. Coordinate mondo: x est, +z nord.
 import { PLACES, WORLD_BOUNDS as B } from './places.js';
+import { playerCarMarker } from './state.js';
 
 const COLORS = { bg: '#3a4246', block: '#8d8a82', road: '#5f7480', building: '#4a4f54', grass: '#6f8a58', piazza: '#a39a88', crossing: '#d8d8d0', tree: '#4f6b3a', car: '#2e3438', fountain: '#6fa0b0', water: '#3d6b78' };
 
@@ -50,6 +51,8 @@ export class MapUI {
   markers() {
     const st = this.state; const out = ['barber', 'cafe', 'depot', 'shop', 'pond', 'court', 'dealer', 'park', 'piazza'].map((k) => PLACES[k]).filter(Boolean);
     if (st.delivery) out.push(PLACES['dl_' + st.delivery.target]);
+    const car = playerCarMarker(st);
+    if (car) out.push(car);
     return out;
   }
   draw() {
@@ -87,9 +90,17 @@ export class MapUI {
     if (label) { g.fillStyle = '#fff'; g.font = '600 12px sans-serif'; g.textAlign = 'center'; g.fillText(label, x, y - r - 4); }
   }
   select(id) {
-    this.selected = id; const m = PLACES[id]; const p = this.cb.getPlayer();
+    this.selected = id; const m = this.markers().find((x) => x.id === id) || PLACES[id]; const p = this.cb.getPlayer();
     const d = Math.round(Math.hypot(p.x - m.x, p.z - m.z));
     const card = document.getElementById('mapCard'); card.classList.remove('hidden');
+    if (m.car) {
+      card.innerHTML = `<b>${m.icon} ${m.name}</b><br><small>${d} m · parcheggiata qui. Avvicinati e tocca Interagisci per salire.</small><div class="row">
+        <button class="pill primary" id="mkDealer">◆ Segna l'Autosalone</button><button class="pill" id="mkX">Chiudi</button></div>`;
+      document.getElementById('mkDealer').onclick = () => { this.cb.onWaypoint('dealer'); this.select('dealer'); };
+      document.getElementById('mkX').onclick = () => { card.classList.add('hidden'); this.selected = null; this.draw(); };
+      this.draw();
+      return;
+    }
     const isWp = this.state.waypoint === id;
     card.innerHTML = `<b>${m.icon} ${m.name}</b><br><small>${d} m in linea d'aria</small><div class="row">
       <button class="pill primary" id="mkSet">${isWp ? 'Rimuovi destinazione' : '◆ Segna destinazione'}</button><button class="pill" id="mkX">Chiudi</button></div>`;
