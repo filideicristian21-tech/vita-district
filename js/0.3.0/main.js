@@ -20,6 +20,7 @@ const store = storage || memStore;
 let { state, status, credited, readOnly } = S.loadState(store, Date.now());
 let dirty = false;
 const markDirty = () => { dirty = true; };
+if (S.migrationGuide(state, status)) markDirty();
 // readOnly: salvataggio di una versione più nuova del gioco, o partita aperta in un'altra scheda → non sovrascrivere.
 function saveNow() {
   if (readOnly) { dirty = false; return false; }

@@ -4,6 +4,8 @@ Gioco web 3D (three.js/WebGL) in un piccolo quartiere inventato, il **Rione Mare
 
 **Gioca:** https://filideicristian21-tech.github.io/vita-district/ (Safari su iPhone, meglio in orizzontale).
 
+Se il telefono mostra ancora la versione precedente, apri la pagina con i file di questa build: https://filideicristian21-tech.github.io/vita-district/v0.3.0.html — il numero di versione resta visibile in alto a sinistra (`v0.3.0`). La Vela gratuita è sul Porto, davanti alla piazza; l'Autosalone Miraggio è segnato sulla mappa a sud.
+
 ## Cosa aspettarsi
 - **Prototipo**, non un gioco finito, e **non Unreal Engine**.
 - Grafica **low-poly, non fotorealistica**: personaggi CC0 semplici con shading ammorbidito, capelli e barba procedurali a strati.

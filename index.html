@@ -7,8 +7,9 @@
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2212%22 fill=%22%23151b20%22/%3E%3Ctext x=%2232%22 y=%2244%22 font-size=%2236%22 text-anchor=%22middle%22 fill=%22%23e6bb70%22%3EV%3C/text%3E%3C/svg%3E">
 <meta name="theme-color" content="#151b20">
-<title>VITA DISTRICT — prototipo</title>
-<link rel="stylesheet" href="./style.css">
+<title>VITA DISTRICT — prototipo v0.3.0</title>
+<!-- 0.3.0 nel nome del file: Pages tiene max-age=600 e ignora la query string, quindi i JS della v0.1 non possono essere riusati. -->
+<link rel="stylesheet" href="./style.0.3.0.css">
 <script type="importmap">{"imports":{"three":"./vendor/three.module.min.js","three/addons/":"./vendor/jsm/"}}</script>
 </head>
 <body>
@@ -19,6 +20,7 @@
 
 <div id="hud">
   <div id="hudLeft">
+    <div class="chip small" id="verStamp">v0.3.0</div>
     <div class="chip" id="money">120 crediti</div>
     <div class="chip small" id="look">Capelli corti · barba ombra</div>
     <div class="chip demo hidden" id="demoBadge">DEMO +0 gg</div>
@@ -77,8 +79,8 @@
 <div id="panel" class="overlay side hidden" role="dialog"><div id="panelBody"></div></div>
 <div id="confirm" class="overlay center hidden" role="alertdialog"><div class="card"><p id="confirmText"></p><div class="row"><button id="confirmNo" class="pill">Annulla</button><button id="confirmYes" class="pill danger">Conferma</button></div></div></div>
 
-<div id="loading"><div><h1>VITA DISTRICT</h1><p>Rione Marea · prototipo web 3D</p><p id="loadMsg" class="muted">Caricamento…</p></div></div>
+<div id="loading"><div><h1>VITA DISTRICT</h1><p>Rione Marea · prototipo web 3D</p><p id="buildStamp">v0.3.0</p><p id="loadMsg" class="muted">Caricamento…</p></div></div>
 <noscript>Serve JavaScript per giocare.</noscript>
-<script type="module" src="./js/main.js"></script>
+<script type="module" src="./js/0.3.0/main.js"></script>
 </body>
 </html>
