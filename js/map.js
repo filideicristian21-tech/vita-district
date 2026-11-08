@@ -1,7 +1,7 @@
 // Mappa grande (marker cliccabili, waypoint) e minimappa. Coordinate mondo: x est, +z nord.
 import { PLACES, WORLD_BOUNDS as B } from './places.js';
 
-const COLORS = { bg: '#3a4246', block: '#8d8a82', road: '#5f7480', building: '#4a4f54', grass: '#6f8a58', piazza: '#a39a88', crossing: '#d8d8d0', tree: '#4f6b3a', car: '#2e3438', fountain: '#6fa0b0' };
+const COLORS = { bg: '#3a4246', block: '#8d8a82', road: '#5f7480', building: '#4a4f54', grass: '#6f8a58', piazza: '#a39a88', crossing: '#d8d8d0', tree: '#4f6b3a', car: '#2e3438', fountain: '#6fa0b0', water: '#3d6b78' };
 
 export class MapUI {
   constructor(world, state, cb) {
@@ -19,6 +19,7 @@ export class MapUI {
     const g = c.getContext('2d'); g.fillStyle = COLORS.road; g.fillRect(0, 0, c.width, c.height);
     const rect = (sh, col) => { const [x0, y0] = this.W2P(sh.x0, sh.z1); const [x1, y1] = this.W2P(sh.x1, sh.z0); g.fillStyle = col; g.fillRect(x0, y0, x1 - x0, y1 - y0); };
     const shapes = this.world.mapShapes;
+    g.fillStyle = COLORS.water; { const [x0, y0] = this.W2P(B.minX, -177.5); g.fillRect(x0, y0, c.width, c.height - y0); }
     shapes.filter((m) => m.type === 'block').forEach((m) => rect(m, COLORS.block));
     shapes.filter((m) => m.type === 'piazza').forEach((m) => rect(m, COLORS.piazza));
     shapes.filter((m) => m.type === 'grass').forEach((m) => rect(m, COLORS.grass));
@@ -32,6 +33,7 @@ export class MapUI {
     g.fillStyle = '#e8eef2'; g.font = `600 ${3.2 * s}px sans-serif`; g.textAlign = 'center';
     let [px, py] = this.W2P(-70, 0); g.fillText('Via del Porto', px, py + 1.1 * s); [px, py] = this.W2P(70, 0); g.fillText('Via del Porto', px, py + 1.1 * s);
     g.save(); [px, py] = this.W2P(-48, 40); g.translate(px, py); g.rotate(-Math.PI / 2); g.fillText('Via delle Reti', 0, 1.1 * s); g.restore();
+    [px, py] = this.W2P(0, -168); g.fillText('Lungomare', px, py + 1.1 * s);
     g.save(); [px, py] = this.W2P(48, -40); g.translate(px, py); g.rotate(-Math.PI / 2); g.fillText('Via dei Fanali', 0, 1.1 * s); g.restore();
     return c;
   }
@@ -46,7 +48,7 @@ export class MapUI {
   open() { this.center(); this.selected = null; document.getElementById('mapCard').classList.add('hidden'); }
   center() { const p = this.cb.getPlayer(); const [x, y] = this.W2P(p.x, p.z); this.view.cx = x; this.view.cy = y; this.view.zoom = 1.6; this.draw(); }
   markers() {
-    const st = this.state; const out = ['barber', 'cafe', 'depot', 'piazza'].map((k) => PLACES[k]);
+    const st = this.state; const out = ['barber', 'cafe', 'depot', 'shop', 'pond', 'court', 'dealer', 'park', 'piazza'].map((k) => PLACES[k]).filter(Boolean);
     if (st.delivery) out.push(PLACES['dl_' + st.delivery.target]);
     return out;
   }
