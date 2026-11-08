@@ -27,5 +27,5 @@ Tutti gli asset sotto sono stati **riusati da cartelle locali di progetti preced
 | assets/tex/stonebase_* | Large Sandstone Blocks | Poly Haven | polyhaven.com/a/large_sandstone_blocks | CC0 1.0 | 512 px |
 | assets/tex/sky_kloofendal_1k.hdr | Kloofendal 48d Partly Cloudy (Pure Sky) | Greg Zaal / Poly Haven | polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky | CC0 1.0 | 1K |
 
-Generati dal codice (nessuna licenza esterna): capelli/barba procedurali, insegne, palo del barbiere, panchine, fontana, edifici, finestre, mappa.
+Generati dal codice (nessuna licenza esterna): auto guidabili Vela/Bruma/Pode e Autosalone Miraggio (v0.3, forme originali, nessun logo o marchio reale), parco, molo, faro, dialoghi; capelli/barba procedurali, insegne, palo del barbiere, panchine, fontana, edifici, finestre, mappa.
 Nomi di luoghi e persone (Rione Marea, Tonino, Marta, Rocco, Bice, Ugo) inventati dagli agenti; nessun marchio reale.
