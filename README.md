@@ -2,7 +2,9 @@
 
 Gioco web 3D (three.js/WebGL) in un piccolo quartiere inventato, il **Rione Marea**: cammini in terza persona o **guidi la tua auto**, usi la mappa, vai dal barbiere, al caffè e fai consegne. Dalla v0.3: tre auto inventate (Vela, Bruma, Pode) da comprare con crediti finti all'Autosalone Miraggio, mappa circa raddoppiata con un anello di strade, il Parco del Faro e il Lungomare, dialoghi a scelte con i personaggi. Barba e capelli crescono col tempo reale (0,40 mm al giorno), anche a gioco chiuso. Nel barbiere e nello Specchio c'è un pulsante **DEMO** che simula giorni senza aspettare.
 
-**Gioca:** https://filideicristian21-tech.github.io/vita-district/ (Safari su iPhone, meglio in orizzontale).
+**Gioca (v0.3 pubblicata):** https://filideicristian21-tech.github.io/vita-district/ (Safari su iPhone, meglio in orizzontale).
+
+La v0.4 è solo un’anteprima locale: `v0.4.0.html`. Non sostituisce `v0.3.0.html`.
 
 Se il telefono mostra ancora la versione precedente, apri la pagina con i file di questa build: https://filideicristian21-tech.github.io/vita-district/v0.3.0.html — il numero di versione resta visibile in alto a sinistra (`v0.3.0`). La Vela gratuita è sul Porto, davanti alla piazza; l'Autosalone Miraggio è segnato sulla mappa a sud.
 
