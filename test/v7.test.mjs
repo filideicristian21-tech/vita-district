@@ -58,8 +58,8 @@ test('orologio: avanza solo col tick (max 1 s alla volta), mai con Date.now', ()
   Life.tick(s.life, 16); Life.tick(s.life, 60 * 60 * 1000); Life.tick(s.life, -5); Life.tick(s.life, NaN);
   assert.equal(s.life.clock.gameMs - a, 16 + 1000);
   assert.equal(/Date\.now|new Date/.test(read('js/0.7.0/life.js').replace(/\/\/.*$/gm, '')), false);
-  assert.equal(Life.DAY_LEN_MS, 600000); // 10 minuti: 5 giorno→notte, 5 notte→giorno
-  atHour(s, 0, 6); const sunrise = s.life.clock.gameMs; atHour(s, 0, 18); assert.equal(s.life.clock.gameMs - sunrise, 300000);
+  assert.equal(Life.DAY_LEN_MS, 300000); assert.equal(Life.HOUR_MS, 12500); // decisione di Cristian: giornata intera (giorno + notte) = 5 minuti
+  atHour(s, 0, 6); const sunrise = s.life.clock.gameMs; atHour(s, 0, 18); assert.equal(s.life.clock.gameMs - sunrise, 150000); // 2,5 minuti dall'alba al tramonto
   atHour(s, 0, 13); assert.equal(Life.daylight(s.life), 1); atHour(s, 0, 23); assert.equal(Life.daylight(s.life), 0); assert.equal(Life.isNight(s.life), true);
 });
 
@@ -91,7 +91,7 @@ test('lavori: un turno pagato per giornata di gioco (in tutto), orari, sblocco m
   assert.equal(Life.takeJob(s, 'barbiere').ok, true);
   assert.equal(Life.startShift(s, 'barbiere').ok, true);
   Life.finishTask(s, 1); Life.finishTask(s, 1); const p = Life.finishTask(s, 1);
-  assert.equal(p.paid, true); assert.equal(p.pay, 9500 + 1900); assert.equal(s.money, 100000 + 11400); assert.equal(Life.gameHour(s.life), 13);
+  assert.equal(p.paid, true); assert.equal(p.pay, 4750 + 950); assert.equal(s.money, 100000 + 5700); assert.equal(Life.gameHour(s.life), 13);
   assert.equal(Life.startShift(s, 'barbiere').ok, false); Life.takeJob(s, 'barista'); assert.equal(Life.startShift(s, 'barista').ok, false, 'niente seconda paga nello stesso giorno');
   // doppio finishTask senza turno: nessun credito
   const m = s.money; assert.equal(Life.finishTask(s, 1).ok, false); assert.equal(s.money, m);
@@ -101,11 +101,34 @@ test('lavori: un turno pagato per giornata di gioco (in tutto), orari, sblocco m
   atHour(s, 2, 9); assert.equal(Life.finishTask(s, 1).ok, false);
   for (let d = 3; d < 6; d++) { atHour(s, d, 9); Life.startShift(s, 'barista'); for (let i = 0; i < 3; i++) Life.finishTask(s, 0); }
   assert.ok(Life.totalShifts(s.life) >= 3); assert.equal(Life.takeJob(s, 'meccanico').ok, true);
-  assert.equal(Life.wageFor(s.life, 'barbiere'), 9500);
+  assert.equal(Life.wageFor(s.life, 'barbiere'), 4750);
   // salvataggio manomesso: niente valori che creano crediti
   const c = Life.copyLife({ ...s.life, work: { ...s.life.work, shift: { job: 'barista', day: 5, done: 2, tip: 999 } } });
   assert.ok(c.work.shift.tip <= 0.6 + 1e-9);
   assert.equal(Life.copyLife({ homes: { owned: ['villa', 'xxx'], main: 'villa' } }).homes.owned.join(), 'soffitta,villa');
+});
+
+test('revisioni v0.7: soffitta non vendibile, turno intero entro l\'orario, giorni futuri azzerati, notte 19–5, cifre raggruppate', () => {
+  const s = newState(NOW); atHour(s, 0, 10);
+  assert.equal(Life.buyHouse(s, 'bilocale').ok, true);
+  const m = s.money; assert.equal(Life.sellHouse(s, 'soffitta').ok, false, 'Cranc/Ledger: la soffitta regalata non dà crediti'); assert.equal(s.money, m);
+  assert.equal(Life.sellHouse(s, 'bilocale').ok, true);
+  Life.takeJob(s, 'barbiere'); atHour(s, 0, 16.5); assert.equal(Life.startShift(s, 'barbiere').can ?? Life.startShift(s, 'barbiere').ok, false, 'Cranc: alle 16:30 un turno di 3 ore sforerebbe le 19');
+  atHour(s, 0, 16); assert.equal(Life.startShift(s, 'barbiere').ok, true);
+  const c = Life.copyLife({ ...s.life, clock: { gameMs: 2 * Life.DAY_LEN_MS }, work: { ...s.life.work, lastPaidDay: 999, paidDays: { barbiere: 999 }, shift: { job: 'barbiere', day: 999, done: 0, tip: 0 } } });
+  assert.equal(c.work.lastPaidDay, 1); assert.equal(c.work.paidDays.barbiere, 1); assert.equal(c.work.shift, null, 'Nexus: niente blocco di giorni futuri');
+  atHour(s, 0, 19); assert.equal(Life.isNight(s.life), true); atHour(s, 0, 18.9); assert.equal(Life.isNight(s.life), false); atHour(s, 1, 4.9); assert.equal(Life.isNight(s.life), true);
+  assert.equal(Life.fmtCr(9500), '9.500'); assert.equal(Life.fmtCr(100000), '100.000'); assert.equal(Life.fmtCr(300), '300');
+  // Ledger B3: un salvataggio v5 senza la chiave money non torna a 100.000
+  const k = mem(); const v5 = JSON.parse(serialize(newState(NOW))); delete v5.money; k.setItem(SAVE_KEY, JSON.stringify(v5));
+  assert.equal(loadState(k, NOW).state.money, 0);
+  // Nexus: le quattro frecce si salvano solo come booleano vero
+  const v5b = JSON.parse(serialize(newState(NOW))); v5b.garage.car = { x: 1, z: 2, yaw: 0, hazard: 'si' }; k.setItem(SAVE_KEY, JSON.stringify(v5b));
+  assert.equal(loadState(k, NOW).state.garage.car.hazard, undefined); v5b.garage.car.hazard = true; k.setItem(SAVE_KEY, JSON.stringify(v5b));
+  assert.equal(loadState(k, NOW).state.garage.car.hazard, true);  // Atlas: il ◆ della casa resta dopo una ricarica; la Salina si apre sul Lungomare
+  const v5c = JSON.parse(serialize(newState(NOW))); v5c.waypoint = 'house_villa'; k.setItem(SAVE_KEY, JSON.stringify(v5c));
+  assert.equal(loadState(k, NOW).state.waypoint, 'house_villa');
+  assert.deepEqual(Life.HOUSES.salina.door, { x: -112.8, z: -134.8 }); assert.equal(Life.HOUSES.salina.face, Math.PI);
 });
 
 test('codice spedito v0.7: TEST_HOOK spento, niente rete/microfono, testi onesti, percorsi giusti', () => {

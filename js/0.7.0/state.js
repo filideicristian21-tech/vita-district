@@ -220,6 +220,7 @@ export function validate(raw, now) {
   if (isNum(p.yaw)) out.player.yaw = p.yaw;
   if (Object.prototype.hasOwnProperty.call(s, 'money') && !isNum(s.money)) out.money = 0;
   else if (isNum(s.money)) out.money = Math.max(0, Math.floor(s.money));
+  else if (isNum(s.version) && s.version >= 5) out.money = 0; // v0.7 (Ledger): togliere la chiave non ridà 100.000
   if (s.inventory) for (const k of Object.keys(out.inventory)) if (isNum(s.inventory[k])) out.inventory[k] = Math.max(0, Math.floor(s.inventory[k]));
   if (s.stats) for (const k of Object.keys(out.stats)) if (isNum(s.stats[k])) out.stats[k] = Math.max(0, Math.floor(s.stats[k]));
   const g = s.grooming || {};
@@ -260,7 +261,7 @@ export function validate(raw, now) {
     out.garage.owned = owned;
     if (owned.includes(gr.selected)) out.garage.selected = gr.selected;
     const c = gr.car || {};
-    if (isNum(c.x) && isNum(c.z) && isNum(c.yaw)) out.garage.car = { x: clamp(c.x, BOUNDS.minX + 2, BOUNDS.maxX - 2), z: clamp(c.z, BOUNDS.minZ + 2, BOUNDS.maxZ - 2), yaw: c.yaw };
+    if (isNum(c.x) && isNum(c.z) && isNum(c.yaw)) out.garage.car = { x: clamp(c.x, BOUNDS.minX + 2, BOUNDS.maxX - 2), z: clamp(c.z, BOUNDS.minZ + 2, BOUNDS.maxZ - 2), yaw: c.yaw, ...(c.hazard === true ? { hazard: true } : {}) };
     if (gr.paint && typeof gr.paint === 'object') {
       for (const id of Object.keys(CARS)) if (typeof gr.paint[id] === 'string' && /^#[0-9a-fA-F]{6}$/.test(gr.paint[id])) out.garage.paint[id] = gr.paint[id];
     }

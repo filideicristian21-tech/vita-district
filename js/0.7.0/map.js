@@ -60,6 +60,7 @@ export class MapUI {
   center() { const p = this.cb.getPlayer(); const [x, y] = this.W2P(p.x, p.z); this.view.cx = x; this.view.cy = y; this.view.zoom = 1.6; this.draw(); }
   markers() {
     const st = this.state; const out = ['barber', 'cafe', 'depot', 'shop', 'pond', 'court', 'dealer', 'park', 'piazza', 'officina', 'corriere', 'bocce', 'belvedere', 'spiaggia', 'lido', 'pineta', 'limoni', 'gelateria', 'lavaggio'].map((k) => PLACES[k]).filter(Boolean);
+    if (st.life && PLACES['house_' + st.life.homes.main]) out.push(PLACES['house_' + st.life.homes.main]); // v0.7 (Atlas): casa principale sulla mappa
     if (st.delivery) out.push(PLACES['dl_' + st.delivery.target]);
     const car = playerCarMarker(st);
     if (car) out.push(car);

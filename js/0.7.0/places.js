@@ -1,6 +1,7 @@
 // Luoghi del Rione Marea (coordinate in metri; x est, z sud→nord: +z = nord).
 import { BOUNDS, EXTRA_PLACES } from './layout.js';
 import { PLACES5 } from './layout5.js';
+import { HOUSES } from './life.js';
 export const PLACES = {
   barber:  { id: 'barber', name: "Barberia «Lama d'Oro»", short: 'Barbiere', icon: '✂', x: -67, z: 14, door: { x: -68, z: 8 }, color: '#e6bb70' },
   cafe:    { id: 'cafe', name: 'Caffè Sottovento', short: 'Caffè', icon: '☕', x: -5, z: -13, door: { x: -5, z: -8 }, color: '#d9a066' },
@@ -21,3 +22,6 @@ export const PLACES = {
   dl_fioraio: { id: 'dl_fioraio', name: 'Fioraio dei Limoni — Colle', short: 'Fioraio', icon: '🌼', x: 46, z: 136, door: { x: 46, z: 132.6 }, color: '#f0a3a3', delivery: 'fioraio' },
 };
 export const WORLD_BOUNDS = { minX: BOUNDS.minX, maxX: BOUNDS.maxX, minZ: -236, maxZ: BOUNDS.maxZ }; // v0.6: si vede anche la zona di mare
+
+// v0.7 (Atlas): le case sono luoghi fissi, così il ◆ della casa resta dopo una ricarica
+for (const [id, h] of Object.entries(HOUSES)) PLACES['house_' + id] = { id: 'house_' + id, name: h.name, short: h.name, icon: '🏠', x: h.door.x, z: h.door.z, door: h.door, color: '#9fd3c7' };

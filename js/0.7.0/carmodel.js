@@ -52,9 +52,11 @@ export function paintMat(color, shiny = false) {
   return new THREE.MeshPhysicalMaterial({ color, roughness: shiny ? 0.25 : 0.36, metalness: 0.0, clearcoat: 1, clearcoatRoughness: shiny ? 0.02 : 0.07, envMapIntensity: shiny ? 1.3 : 1.1 });
 }
 // lavaggio: carrozzeria più lucida (solo estetica)
+// v0.7 (Forge): il riflesso segue il giorno e la notte anche per auto create o lavate più tardi
+export const ENV_K = { value: 1 };
 export function setShiny(root, shiny) {
   const p = root.userData.paintMesh; if (!p) return;
-  const m = p.material; m.roughness = shiny ? 0.25 : 0.36; m.clearcoatRoughness = shiny ? 0.02 : 0.07; m.envMapIntensity = shiny ? 1.3 : 1.1; root.userData.shiny = shiny;
+  const m = p.material; m.roughness = shiny ? 0.25 : 0.36; m.clearcoatRoughness = shiny ? 0.02 : 0.07; m.userData.envBase = shiny ? 1.3 : 1.1; m.envMapIntensity = m.userData.envBase * ENV_K.value; root.userData.shiny = shiny;
 }
 function colored(g, hex) { const c = new THREE.Color(hex); const n = g.attributes.position.count; const a = new Float32Array(n * 3); for (let i = 0; i < n; i++) a.set([c.r, c.g, c.b], i * 3); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g.index ? g.toNonIndexed() : g; }
 function strip(g) { for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'color'].includes(k)) g.deleteAttribute(k); return g; }
@@ -98,9 +100,9 @@ export function buildCar(id, spec, color = spec.color) {
     const side = sx > 0 ? 1 : 0; // l'auto guarda +z: la sua sinistra è +x
     // sotto i fari/fanali, alla stessa x (gli angoli smussati della scocca nasconderebbero un indicatore sul bordo)
     const lw = Math.min(0.32, W * 0.18);
-    const f = new THREE.BoxGeometry(lw * 0.8, 0.07, 0.05); f.translate(sx * (W / 2 - lw / 2 - 0.12), pr.light - 0.085, L / 2 - 0.015); bg.push(colored(f, side ? '#ffffff' : '#000000'));
-    const r = new THREE.BoxGeometry(lw * 0.8, 0.07, 0.05); r.translate(sx * (W / 2 - lw / 2 - 0.1), pr.light - 0.045, -L / 2 + 0.015); bg.push(colored(r, side ? '#ffffff' : '#000000'));
-    const rp = new THREE.BoxGeometry(0.03, 0.05, 0.16); rp.translate(sx * (W / 2 + 0.015), pr.bot + 0.42, L * 0.3); bg.push(colored(rp, side ? '#ffffff' : '#000000'));
+    const f = new THREE.BoxGeometry(lw, 0.08, 0.05); f.translate(sx * (W / 2 - lw / 2 - 0.12), pr.light - 0.09, L / 2 - 0.015); bg.push(colored(f, side ? '#ffffff' : '#000000'));
+    const r = new THREE.BoxGeometry(lw, 0.09, 0.05); r.translate(sx * (W / 2 - lw / 2 - 0.1), pr.light - 0.055, -L / 2 + 0.015); bg.push(colored(r, side ? '#ffffff' : '#000000'));
+    const rp = new THREE.BoxGeometry(0.03, 0.07, 0.24); rp.translate(sx * (W / 2 + 0.015), pr.bot + 0.42, L * 0.3); bg.push(colored(rp, side ? '#ffffff' : '#000000'));
   }
   const blinkU = { uL: { value: 0 }, uR: { value: 0 } };
   const blinkM = new THREE.MeshBasicMaterial({ vertexColors: true });

@@ -44,7 +44,7 @@ export const DIALOGS = {
   // v0.5 — Contrada Salina e Colle dei Limoni (testi: idee-v5/lumen.md, adattati)
   pina: { name: 'Pina', role: 'bagnina · Lido Conchiglia', hello: 'Sole, sabbia e niente fretta. Hai visto le conchiglie sulla battigia?', bye: 'Ciao! Occhio al bagnasciuga, scivola.',
     qs: [['Cosa si fa qui?', 'Ogni giorno il mare porta cinque conchiglie sulla sabbia asciutta. Raccoglile tutte e ti do 12 crediti finti, una volta al giorno.'],
-      ['Si può fare il bagno?', 'Il mare lo guardi e basta, qui. Io controllo la spiaggia dalla torretta, tu goditi l\'ombrellone.'],
+      ['Si può fare il bagno?', 'Certo, davanti alla Spiaggia di Ponente. Resta dove vedo dalla torretta e, se sei stanco, torna a riva.'],
       ['Perché Lido Conchiglia?', 'Perché da bambina le raccoglievo qui. Adesso le conto, e qualcuna la lascio per te.']] },
   dario: { name: 'Dario', role: 'Autolavaggio Schiuma', hello: 'Ciao! Porti la macchina sotto il portale e ci penso io. Sei crediti finti, due minuti.', bye: 'Vai piano nelle pozzanghere, eh.',
     qs: [['Cosa cambia dopo il lavaggio?', 'Solo la carrozzeria: brilla per un giorno, poi torna come prima. Non ripara niente, è vanità pura.'],
@@ -57,6 +57,22 @@ export const DIALOGS = {
 };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 // HTML del dialogo: storia delle battute + pulsanti delle domande non ancora fatte
+// v0.7 (Lumen): saluti notturni (ora di gioco, dalle 19:00 alle 5:00)
+export const NIGHT_HELLO = {
+  tonino: 'Siamo quasi chiusi, ma per una chiacchiera la sedia è libera.',
+  marta: 'A quest\'ora solo camomilla. Il caffè te lo faccio domattina.',
+  rocco: 'Ultimo giro della sera. Di notte i pacchi pesano il doppio, giuro.',
+  bice: 'Chi è a quest\'ora? Parla piano, che il gatto dorme.',
+  ugo: 'Guarda le stelle sopra il Pozzo. Una volta le contavo, ora mi contano loro.',
+  saverio: 'Di notte le auto brillano di più e nessuno chiede lo sconto.',
+  gino: 'Officina chiusa, ma il motore lo ascolto lo stesso. Torna domattina.',
+  lia: 'Di notte niente consegne grosse: le strade sono di chi dorme.',
+  nadia: 'Luce di luna: le foto più belle sono quelle di adesso.',
+  ottavio: 'Bocce a riposo. Teresa dice che giochiamo meglio al buio. Teresa mente.',
+  pina: 'Spiaggia chiusa, torretta vuota. Il mare di notte si guarda dalla riva.',
+  dario: 'Portale spento. Domani torna a brillare, e anche la tua macchina.',
+  assunta: 'Sto chiudendo, tesoro. L\'ultima pallina di limone però è tua.',
+};
 export function dialogHTML(id, asked = [], hello) {
   const d = DIALOGS[id]; if (!d) return '';
   const lines = [`<div class="say">«${esc(hello || d.hello)}»</div>`];

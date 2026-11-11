@@ -547,9 +547,9 @@ export class World {
   }
   bench(x, z, ry) {
     const M = this.mats; const g = new THREE.Group(); g.position.set(x, 0.12, z); g.rotation.y = ry;
-    for (let i = 0; i < 3; i++) { const s = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.04, 0.12), M.wood); s.position.set(0, 0.45, -0.14 + i * 0.14); s.castShadow = true; g.add(s); }
-    for (let i = 0; i < 2; i++) { const s = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.1, 0.03), M.wood); s.position.set(0, 0.62 + i * 0.14, -0.24); s.rotation.x = -0.12; s.castShadow = true; g.add(s); }
-    for (const sx of [-0.75, 0.75]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.45, 0.45), M.metal); l.position.set(sx, 0.22, -0.02); l.castShadow = true; g.add(l); }
+    for (let i = 0; i < 3; i++) { const s = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.04, 0.12), M.wood); s.position.set(0, 0.45, -0.14 + i * 0.14); s.castShadow = false; g.add(s); }
+    for (let i = 0; i < 2; i++) { const s = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.1, 0.03), M.wood); s.position.set(0, 0.62 + i * 0.14, -0.24); s.rotation.x = -0.12; s.castShadow = false; g.add(s); }
+    for (const sx of [-0.75, 0.75]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.45, 0.45), M.metal); l.position.set(sx, 0.22, -0.02); l.castShadow = false; g.add(l); }
     g.userData.flatten = true; this.group.add(g);
     const c = Math.abs(Math.cos(ry)) > 0.5;
     this.addBox(x - (c ? 0.95 : 0.3), x + (c ? 0.95 : 0.3), z - (c ? 0.3 : 0.95), z + (c ? 0.3 : 0.95), 0, 0.9);
@@ -645,7 +645,7 @@ export class World {
     const seat = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.18, 0.65), chairMat); seat.position.y = 0.6; chair.add(seat);
     const back = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.8, 0.14), chairMat); back.position.set(0, 1.05, 0.28); chair.add(back);
     const base = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.3, 0.5, 16), M.metal); base.position.y = 0.25; chair.add(base);
-    chair.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); this.group.add(chair);
+    chair.traverse((m) => { if (m.isMesh) { m.castShadow = false; m.receiveShadow = true; } }); this.group.add(chair);
     this.addBox(-68.4, -67.6, 16.3, 17.0, 0, 1.4);
     const mirror = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), new THREE.MeshStandardMaterial({ color: '#c8d4dc', roughness: 0.02, metalness: 1 }));
     mirror.position.set(-68, 1.75, 19.7); mirror.rotation.y = Math.PI; this.group.add(mirror);
@@ -658,7 +658,7 @@ export class World {
     this.addBox(-8, -2, -17.2, -16.4, 0, 1.2);
     const cm = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.45, 0.45), M.metal); cm.position.set(-4, 1.4, -17); this.group.add(cm);
     const table = (x, z) => {
-      const top = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.03, 20), M.marble); top.position.set(x, 0.12 + 0.74, z); top.castShadow = true; this.group.add(top);
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.03, 20), M.marble); top.position.set(x, 0.12 + 0.74, z); top.castShadow = false; this.group.add(top);
       const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.2, 0.74, 10), M.metal); leg.position.set(x, 0.12 + 0.37, z); this.group.add(leg);
       this.circles.push({ x, z, r: 0.45 });
     };
@@ -689,7 +689,7 @@ export class World {
     for (let i = 0; i < 160; i++) { const a = r() * Math.PI * 2; if (Math.sin(a) < -0.75) continue; const k = 0.9 + r() * 0.12;
       q.setFromEuler(e.set((r() - 0.5) * 0.25, 0, (r() - 0.5) * 0.25)); const hgt = 0.7 + r() * 0.9;
       m4.compose(v.set(PX + Math.cos(a) * 4.6 * k, 0.1, PZ + Math.sin(a) * 5.4 * k), q, sc.set(1, hgt, 1)); reeds.setMatrixAt(n++, m4); }
-    reeds.count = n; reeds.castShadow = true; this.group.add(reeds);
+    reeds.count = n; reeds.castShadow = false; this.group.add(reeds);
     for (const [x, z] of [[PX - 5.5, PZ + 5], [PX + 5.6, PZ - 3], [PX - 5.8, PZ - 4.5]]) { const s2 = shrub2.clone(true); s2.position.set(x, 0.15, z); s2.rotation.y = r() * 6; this.group.add(s2); }
     this.bench(PX + 4.2, PZ - 6.6, 0);
     this.fishSpot = { x: PX, z: PZ - 6.3, ry: 0 };
@@ -723,7 +723,7 @@ export class World {
     this.circles.push({ x: CX, z: HZ + 0.6, r: 0.25 });
     this.shotSpot = { x: CX, z: CZ + 1.6, ry: 0 };
     this.ball = new THREE.Mesh(new THREE.SphereGeometry(0.12, 20, 14), new THREE.MeshStandardMaterial({ color: '#c8642a', roughness: 0.7 }));
-    this.ball.castShadow = true; this.ball.position.set(CX + 4.4, 0.24, CZ - 6.4); this.scene.add(this.ball);
+    this.ball.castShadow = false; this.ball.position.set(CX + 4.4, 0.24, CZ - 6.4); this.scene.add(this.ball);
     // recinzione bassa sui lati
     const fenceM = new THREE.MeshStandardMaterial({ color: '#59636a', roughness: 0.5, metalness: 0.6 });
     for (const sx of [-1, 1]) {
@@ -933,7 +933,7 @@ export class World {
     box('wall', 7.2, 0.5, 0.2, -222.5, base + 3.85, 104.1); box('wall', 0.2, 0.5, 8, -219.1, base + 3.85, 108); // parapetto della terrazza
     // tetto a padiglione in coppi
     const roof = new THREE.ConeGeometry(1, 1, 4, 1); roof.rotateY(Math.PI / 4); roof.scale(17.4 / Math.SQRT2 * 1, 2.4, 11.4 / Math.SQRT2); roof.translate(-234, base + 6.6 + 1.2, 107);
-    { const uv = roof.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 6, uv.getY(i) * 2); } parts.roof.push(roof);
+    { const uv = roof.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 6, uv.getY(i) * 2); } { const rf = roof.toNonIndexed(); rf.computeVertexNormals(); parts.roof.push(rf); } // falde nette (Forge)
     box('stone', 16.6, 0.5, 10.6, -234, base + 0.25, 107, 2); box('stone', 7.6, 0.5, 8.6, -222.5, base + 0.25, 108, 2); // zoccolo in pietra
     // loggia ad archi sul fronte sud: colonne, architrave, pavimento e terrazzo in marmo
     const cols = [-241, -238, -235.6, -232.4, -230, -227]; // varco centrale più largo davanti al portone
@@ -947,7 +947,7 @@ export class World {
     box('water', 8.4, 0.05, 6.4, -219.5, base + 0.41, 96, 4);
     // finestre (vetro) e porta
     const win = (x, y, z, w, h, side) => { if (side === 'z') box('glass', w, h, 0.08, x, y, z, 1); else box('glass', 0.08, h, w, x, y, z, 1); };
-    for (const x of [-239.5, -236.5, -231.5, -228.5]) win(x, base + 4.6, 101.94, 1.2, 1.6, 'z');
+    for (const x of [-239.5, -236.5, -231.5, -228.5]) win(x, base + 5.0, 101.94, 1.2, 1.6, 'z'); // sopra la lastra del terrazzo (Forge)
     for (const x of [-238.5, -229.5]) win(x, base + 1.7, 101.94, 1.3, 2.0, 'z');
     for (const z of [104.5, 109.5]) { win(-242.04, base + 1.8, z, 1.3, 1.7, 'x'); win(-242.04, base + 4.6, z, 1.3, 1.7, 'x'); }
     for (const x of [-224.5, -220.5]) win(x, base + 1.8, 103.94, 1.4, 1.8, 'z');
@@ -957,14 +957,15 @@ export class World {
     hedge(L.x0, -235.6, L.z0, L.z0 + 0.6); hedge(-232.4, L.x1, L.z0, L.z0 + 0.6); hedge(L.x0, L.x0 + 0.6, L.z0, L.z1); hedge(L.x1 - 0.6, L.x1, L.z0, L.z1); hedge(L.x0, L.x1, L.z1 - 0.6, L.z1);
     for (const [x, z] of [[-244, 92.5], [-244, 116], [-216, 116], [-214.8, 104], [-244, 104], [-226, 116]]) { const c = new THREE.ConeGeometry(0.75, 6.2, 7); c.translate(x, base + 3.4, z); parts.green.push(c); const t = new THREE.CylinderGeometry(0.12, 0.16, 0.5, 6); t.translate(x, base + 0.25, z); parts.green.push(t); this.circles.push({ x, z, r: 0.5 }); }
     for (const sx of [-235.8, -232.2]) { const p = new THREE.BoxGeometry(0.35, 2.0, 0.35); p.translate(sx, base + 1.0, L.z0 + 0.3); parts.stone.push(p); }
-    for (let k = 0; k < 9; k++) { const b = new THREE.CylinderGeometry(0.025, 0.025, 1.7, 5); b.translate(-235.4 + k * 0.4, base + 0.95, L.z0 + 0.3); parts.iron.push(b); }
-    box('iron', 3.6, 0.08, 0.06, -234, base + 1.75, L.z0 + 0.3, 1); box('iron', 3.6, 0.08, 0.06, -234, base + 0.25, L.z0 + 0.3, 1);
+    // v0.7 (Atlas): cancello aperto, le due ante girate contro la siepe (prima sembrava chiuso ma si attraversava)
+    for (const [hx, dir] of [[-235.6, 1], [-232.4, -1]]) { for (let k = 0; k < 4; k++) { const b = new THREE.CylinderGeometry(0.025, 0.025, 1.7, 5); b.translate(hx + dir * 0.05, base + 0.95, L.z0 + 0.7 + k * 0.4); parts.iron.push(b); }
+      box('iron', 0.06, 0.08, 1.6, hx + dir * 0.05, base + 1.75, L.z0 + 1.4, 1); box('iron', 0.06, 0.08, 1.6, hx + dir * 0.05, base + 0.25, L.z0 + 1.4, 1); }
     // materiali (tabella condivisa dove possibile)
     const mats = {
       wall: this._villaWall ||= pbr('plaster', { roughness: 0.92, color: '#f0e2c8' }, 0.5),
       roof: this._villaRoof ||= pbr('roof', { roughness: 0.82, color: '#c87a5a' }, 0.6),
       stone: M.stone, marble: M.marble,
-      glass: this.villaGlass = new THREE.MeshStandardMaterial({ color: '#25343e', roughness: 0.06, metalness: 0.55, envMapIntensity: 1.3, emissive: '#ffd49a', emissiveIntensity: 0 }),
+      glass: this.villaGlass = new THREE.MeshStandardMaterial({ color: '#25343e', roughness: 0.06, metalness: 0.55, envMapIntensity: 1.3, emissive: '#ffc98a', emissiveIntensity: 0 }),
       water: new THREE.MeshStandardMaterial({ color: '#3fb6c4', roughness: 0.08, metalness: 0.1, envMapIntensity: 1.2, emissive: '#1d6f7a', emissiveIntensity: 0 }),
       green: new THREE.MeshStandardMaterial({ color: '#3d5a36', roughness: 0.9 }),
       iron: M.metal,

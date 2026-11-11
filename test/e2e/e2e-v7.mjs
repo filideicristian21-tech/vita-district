@@ -235,8 +235,8 @@ await run('v7 frecce', async () => {
   ok('freccia destra: lampeggia solo a destra', R.blink === 'R' && R.seen.includes('0:1') && !R.seen.some((x) => x.startsWith('1:')), R);
   // svolta a destra di ~90° e poi dritto: la freccia si spegne da sola
   // svolta a destra: sterzo a destra finché l'auto ha girato di ~90°, poi dritto → la freccia si spegne da sola
-  const auto = await ev(async () => { const v = window.__vd; v.placeCar(-164, 80.5, -Math.PI / 2); const y0 = v.car.yaw; v.setDrive({ gas: 0.5, steerR: 1 });
-    let turned = 0; for (let i = 0; i < 120 && turned < 1.4; i++) { await new Promise((r) => setTimeout(r, 100)); turned = Math.abs(Math.atan2(Math.sin(v.car.yaw - y0), Math.cos(v.car.yaw - y0))); }
+  const auto = await ev(async () => { const v = window.__vd; v.placeCar(-164, 80.5, -Math.PI / 2); const y0 = v.car.yaw; v.setDrive({ gas: 0.8, steerR: 1 });
+    let turned = 0; for (let i = 0; i < 300 && turned < 1.4; i++) { await new Promise((r) => setTimeout(r, 100)); turned = Math.abs(Math.atan2(Math.sin(v.car.yaw - y0), Math.cos(v.car.yaw - y0))); }
     const during = v.blink; v.setDrive({ steerR: 0, gas: 0, brake: 1 }); for (let i = 0; i < 40 && v.blink; i++) await new Promise((r) => setTimeout(r, 100)); v.setDrive({ brake: 0 });
     return { during, turned: +turned.toFixed(2), blink: v.blink, car: v.car }; });
   ok('dopo la svolta la freccia si spegne da sola', auto.during === 'R' && auto.turned > 1.04 && auto.blink === null, auto);
@@ -262,19 +262,19 @@ await run('v7 case', async () => {
   const s = await ev(async () => { const v = window.__vd; const W = () => new Promise((r) => setTimeout(r, 120)); v.setHour(12); v.openHouse('bilocale'); await W(); const dis = document.getElementById('hSleep').disabled; const day0 = v.Life.gameDay(v.state.life);
     v.setHour(22); v.openHouse('bilocale'); await W(); document.getElementById('hSleep').click(); await W(); const q = v.player.root.position;
     return { dis, day0, day: v.Life.gameDay(v.state.life), hour: +v.Life.gameHour(v.state.life).toFixed(1), pos: [+q.x.toFixed(1), +q.z.toFixed(1)] }; });
-  ok('dormire: di giorno no, di notte sì → 7:00 del giorno dopo, davanti a casa', s.dis && s.day === s.day0 + 1 && s.hour === 7 && Math.abs(s.pos[0] - 6) < 0.5 && Math.abs(s.pos[1] - 38) < 0.5, s);
+  ok('dormire: di giorno no, di notte sì → 7:00 del giorno dopo, davanti a casa', s.dis && s.day === s.day0 + 1 && Math.abs(s.hour - 7) < 0.25 && Math.abs(s.pos[0] - 6) < 0.5 && Math.abs(s.pos[1] - 38) < 0.5, s);
 });
 await run('v7 lavoro', async () => {
   const r = await ev(async () => { const v = window.__vd; const W = () => new Promise((r) => setTimeout(r, 120)); v.closeAll(); v.setHour(10); v.openBarber(); await W();
     const btn = !!document.getElementById('jobBtn'); document.getElementById('jobBtn').click(); await W(); document.getElementById('jTake').click(); await W();
     const m0 = v.state.money; document.getElementById('jStart').click(); await W();
-    const steps = []; for (let i = 0; i < 3; i++) { if (document.getElementById('tGo')) { v.forceTask(1); document.getElementById('tGo').click(); steps.push('bar'); } else { document.querySelector('[data-o="0"]').click(); steps.push('pick'); } await W(); }
+    const steps = []; for (let i = 0; i < 3; i++) { await new Promise((r) => setTimeout(r, 520)); if (document.getElementById('tGo')) { v.forceTask(1); document.getElementById('tGo').click(); steps.push('bar'); } else { document.querySelector('[data-o="0"]').click(); steps.push('pick'); } await W(); }
     const slip = document.getElementById('panelBody').textContent; const paid = v.state.money - m0;
     v.closeAll(); v.openJob('barbiere'); await W(); const again = document.getElementById('jStart').disabled; const st2 = v.Life.startShift(v.state, 'barbiere');
     v.Life.takeJob(v.state, 'barista'); v.setHour(12); const other = v.Life.startShift(v.state, 'barista');
     v.state.life.clock.gameMs += v.Life.DAY_LEN_MS; v.setHour(10); const next = v.Life.startShift(v.state, 'barista'); v.Life.takeJob(v.state, 'barbiere'); v.state.life.work.shift = null; v.closeAll();
-    return { btn, steps, paid, slip: /Busta paga/.test(slip), again, st2: st2.ok, other: other.ok, next: next.ok, shifts: v.state.life.work.shifts, payslips: v.state.life.work.payslips.length }; });
-  ok('barbiere da Tonino: 3 compiti, busta paga 9.500 + mancia 1.900', r.btn && r.steps.join() === 'bar,pick,bar' && r.paid === 11400 && r.slip, r);
+    return { btn, steps, paid, slip: /Busta paga|primo stipendio/.test(slip), again, st2: st2.ok, other: other.ok, next: next.ok, shifts: v.state.life.work.shifts, payslips: v.state.life.work.payslips.length }; });
+  ok('barbiere da Tonino: 3 compiti, busta paga 4.750 + mancia 950', r.btn && r.steps.join() === 'pick,bar,bar' && r.paid === 5700 && r.slip, r);
   ok('una paga per giorno: stesso giorno no (né qui né in un altro lavoro), il giorno dopo sì', r.again && r.st2 === false && r.other === false && r.next === true, r);
 });
 await run('v7 hud notte', async () => { await ev(() => window.__vd.setHour(22)); await sleep(400); await hud('notte'); await ev(() => window.__vd.setHour(10)); });

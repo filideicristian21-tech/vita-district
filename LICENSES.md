@@ -1,6 +1,6 @@
-# Licenze — VITA DISTRICT v0.1
+# Licenze — VITA DISTRICT v0.7
 
-Codice del gioco (`src/js`, `src/*.html`, `src/style.css`, `tests/`, `tools/*.mjs`): scritto per questo prototipo.
+Codice del gioco (`js/`, `*.html`, `style*.css`, `test/`): scritto per questo prototipo. Librerie terze: solo `vendor/` (three.js r160).
 Tutti gli asset sotto sono stati **riusati da cartelle locali di progetti precedenti sulla stessa macchina** (`/workspace/reallife`, `/workspace/royale3d`), dove fonte e licenza erano già registrate in `reallife/docs/LICENZE-ASSET.md` e `royale3d/CREDITS.md`. In questo turno non è stato scaricato niente da internet; le licenze riportate sono quelle documentate lì (non ricontrollate online oggi).
 
 | File | Asset | Autore | Fonte | Licenza | Modifiche |
@@ -11,7 +11,7 @@ Tutti gli asset sotto sono stati **riusati da cartelle locali di progetti preced
 | assets/chars/cassiera.glb | Animated Woman (Marta, passante) | Quaternius | poly.pizza/m/qJ2gsTUBHL | CC0 1.0 | colori a runtime |
 | assets/chars/anziana.glb | Woman Casual (Signora Bice) | Quaternius | poly.pizza/m/jpKRgGDxhk | CC0 1.0 | colori a runtime |
 | assets/chars/hoodie.glb | Hoodie Character (Rocco, passante) | Quaternius | poly.pizza/m/gKLBoRsyKe | CC0 1.0 | colori a runtime |
-| assets/props/corallo.glb | Car (NormalCar1) | Quaternius | poly.pizza/u/Quaternius | CC0 1.0 | materiali rifatti (progetto reallife) |
+| assets/props/corallo.glb | Car (NormalCar1) | Quaternius | Cars Pack, quaternius.com/packs/cars.html (nov 2018) | CC0 1.0 | materiali rifatti (progetto reallife) |
 | assets/props/sedan.glb, van.glb | Free Low Poly Vehicles Pack | RGS_Dev | rgsdev.itch.io/free-low-poly-vehicles-pack | CC0 1.0 | convertiti/materiali (progetto reallife) |
 | assets/props/street_lamp_01.glb | Street Lamp 01 | Poly Haven | polyhaven.com/a/street_lamp_01 | CC0 1.0 | semplificato (gltf-transform simplify 0.3) |
 | assets/props/shrub_02.glb, shrub_04.glb | Shrub 02 / 04 | Poly Haven | polyhaven.com/a/shrub_02, /a/shrub_04 | CC0 1.0 | semplificati (simplify 0.12) |
@@ -47,3 +47,11 @@ Generati dal codice nella v0.5 (nessuna licenza esterna): quartieri nuovi (Spiag
 **Nessun asset nuovo scaricato.** La v0.6 riusa solo i file già elencati sopra; tutto il nuovo è generato dal codice: fondale di sabbia con pendenza, scogli, posidonia, boe, shader del mare (colore per profondità, schiuma a riva, vista da sotto), nebbia subacquea, pose del nuoto (libero, rana, dorso, sott'acqua) calcolate sullo scheletro esistente, scocca arrotondata delle auto, cerchi a razze, pneumatici, abitacolo e linee delle porte, lampione semplificato per la distanza.
 
 **Nota Quaternius (Guard).** Il 28/8/2026 Quaternius è passato dalla CC0 alla Quaternius Asset License (QAL) v1.0 (quaternius.com/license.html). I 6 file Quaternius di questo progetto (5 personaggi e `corallo.glb`) sono copie locali precedenti a quella data e restano registrati come CC0 1.0 (sezione 7 della QAL: gli asset già ottenuti mantengono la licenza di allora). Ogni file Quaternius scaricato **dopo** il 28/8/2026 va scritto qui come **QAL v1.0**, con data e URL, mai come CC0, e non va ridistribuito come pacchetto di soli asset. Nella v0.6 non ne è stato aggiunto nessuno.
+
+## Aggiunte v0.7.0 (anteprima)
+
+**Nessun asset nuovo scaricato.** La v0.7 riusa solo i file già elencati sopra. Tutto il nuovo è generato dal codice: orologio e ciclo giorno/notte (stelle, luna, pozze di luce), villa e case, lavori, frecce delle auto, finestre emissive, HUD. Nessun glb/gltf/fbx, texture, HDR, audio, font o libreria terza aggiunti rispetto alla v0.6. Licenze del registro ricontrollate online da Scout l'11/11/2026.
+
+**Nota Quaternius.** Confermata la nota della v0.6: i 6 file già in repo (5 personaggi Poly Pizza, date 2021–2022, e `corallo.glb`) restano CC0 1.0 (QAL v1.0 §7, non retroattiva). Nella v0.7 non ne è stato aggiunto nessuno. Ogni download Quaternius dal 28/8/2026 va registrato come **QAL v1.0** (data e URL), mai come CC0, e i file grezzi non vanno lasciati in un repo o build pubblici come pacchetto di asset.
+
+Autori Poly Haven non riportati sopra (CC0, credito facoltativo): street_lamp_01 Josh Dean; shrub_02/04 Rico Cilliers; plastered_wall_02 Charlotte Baglioni; painted_plaster_wall Amal Kumar; cobblestone_floor_08 e large_sandstone_blocks Rob Tuytel; cielo kloofendal Greg Zaal con modifiche di Jarod Guest.

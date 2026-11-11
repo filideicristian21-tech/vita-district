@@ -19,12 +19,15 @@ export function litInstancedGlass(mat) {
   mat.customProgramCacheKey = () => 'vd7litInst';
 }
 // Finestre dei quartieri v0.4/v0.5 (vertex color): quelle già «calde» di giorno + ~22% delle altre.
+// v0.7 (Forge): il seme viene dalla posizione nel mondo (geometria già in coordinate mondo), così non si accendono «a blocchi» per colore.
 export function litVertexGlass(mat) {
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uNight = NIGHT;
-    sh.fragmentShader = 'uniform float uNight;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+    sh.vertexShader = 'varying vec2 vWin;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+  { vec4 wp = modelMatrix * vec4(transformed, 1.0); vWin = floor(wp.xz / 1.4 + 0.5) + floor(wp.y / 3.0) * 17.0; }`);
+    sh.fragmentShader = 'uniform float uNight;\nvarying vec2 vWin;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
   #ifdef USE_COLOR
-  float seedW = fract(sin(dot(vColor.rgb, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+  float seedW = fract(sin(dot(vWin, vec2(12.9898, 78.233))) * 43758.5453);
   float litW = max(step(0.05, vColor.r - vColor.b), step(seedW, 0.22));
   totalEmissiveRadiance += uNight * litW * ${WARM} * (0.45 + 0.7 * fract(seedW * 37.0));
   #endif`);
@@ -45,10 +48,16 @@ export function litLantern(mat) {
 // Pozze di luce a terra sotto i lampioni: una InstancedMesh per tutta la città (1 draw call), additiva.
 export function lightPools(points) {
   const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
-  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,214,150,1)'); gr.addColorStop(0.45, 'rgba(255,190,120,0.45)'); gr.addColorStop(1, 'rgba(255,170,100,0)');
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,199,122,1)'); gr.addColorStop(0.45, 'rgba(255,186,110,0.45)'); /* #FFC77A (Spark) */ gr.addColorStop(1, 'rgba(255,170,100,0)');
   g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
-  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: true, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+  // v0.7 (Forge): additivo + nebbia = quadrati velati in lontananza; si spengono a mano tra 60 e 140 m
+  mat.onBeforeCompile = (sh) => {
+    sh.vertexShader = 'varying float vVD;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  vVD = -mvPosition.z;');
+    sh.fragmentShader = 'varying float vVD;\n' + sh.fragmentShader.replace('#include <opaque_fragment>', '#include <opaque_fragment>\n  gl_FragColor.a *= 1.0 - smoothstep(60.0, 140.0, vVD);');
+  };
+  mat.customProgramCacheKey = () => 'vd7pools';
   const geo = new THREE.PlaneGeometry(7, 7).rotateX(-Math.PI / 2);
   const im = new THREE.InstancedMesh(geo, mat, Math.max(1, points.length)); const m = new THREE.Matrix4();
   points.forEach(([x, y, z], i) => { m.makeTranslation(x, y, z); im.setMatrixAt(i, m); });

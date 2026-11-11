@@ -178,3 +178,11 @@ body.blinkOn #speedo .tind.lit{color:#ffa21a;text-shadow:0 0 8px #ff9a1a}
 .jbar .zone{position:absolute;left:39%;width:22%;top:0;bottom:0;background:#4caf7a66;border-left:2px solid #7fd0a0;border-right:2px solid #7fd0a0}
 .jbar .mk{position:absolute;top:2px;bottom:2px;width:6px;margin-left:-3px;border-radius:3px;background:#fff;box-shadow:0 0 8px #fff8}
 .pill.big{min-height:52px;font-size:18px;padding:0 28px}
+/* v0.7 · revisioni Spark e Nexus */
+#dBlinks .blk{border-color:#ffffff4d}
+body.blinkOn #dBlinks .blk.on{box-shadow:0 0 10px #ff9a1a80}
+#dBlinks .haz.on{background:#ff9a1a;color:#151b20;border-color:#ffd08a}
+.house .pill.primary[disabled]{opacity:.45;color:#8a9096}
+.house.own{border-color:#9fd3c7}
+.warn{display:block;color:#ffcf8a;margin:4px 0}
+@media (orientation:portrait){#dBlinks{bottom:calc(var(--sa-b) + 190px)}}
