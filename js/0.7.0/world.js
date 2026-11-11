@@ -989,7 +989,7 @@ export class World {
     this.houseSigns = {};
     for (const [id, h] of Object.entries(HOUSES)) {
       const side = id === 'villa' ? { x: -3.4, z: -10 } : { x: Math.cos(h.face) * 1.6 - Math.sin(h.face) * 0.62, z: -Math.sin(h.face) * 1.6 - Math.cos(h.face) * 0.62 }; // contro la facciata, accanto alla porta
-      const m = new THREE.Mesh(geo, this.signMats.sale); m.position.set(h.door.x + side.x, this.groundHeight(h.door.x, h.door.z), h.door.z + side.z); m.rotation.y = h.face; m.castShadow = true;
+      const m = new THREE.Mesh(geo, this.signMats.sale); m.position.set(h.door.x + side.x, this.groundHeight(h.door.x, h.door.z), h.door.z + side.z); m.rotation.y = h.face; m.castShadow = false; // niente ombra: 1 draw call per cartello
       this.scene.add(m); this.houseSigns[id] = m; this.circles.push({ x: m.position.x, z: m.position.z, r: 0.12 });
     }
     this.sign('FARO & MARE', 'immobiliare · case e ville · crediti di gioco', AGENCY.x, 3.4, AGENCY.z - 0.75, AGENCY.face, 5.2);

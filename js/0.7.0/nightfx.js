@@ -14,7 +14,7 @@ export function litInstancedGlass(mat) {
   vSeed = 1.0;
 #endif`);
     sh.fragmentShader = 'uniform float uNight;\nvarying float vSeed;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-  totalEmissiveRadiance += uNight * step(vSeed, 0.35) * ${WARM} * 1.6;`);
+  totalEmissiveRadiance += uNight * step(vSeed, 0.35) * ${WARM} * (0.45 + 0.75 * fract(vSeed * 37.0));`);
   };
   mat.customProgramCacheKey = () => 'vd7litInst';
 }
@@ -26,7 +26,7 @@ export function litVertexGlass(mat) {
   #ifdef USE_COLOR
   float seedW = fract(sin(dot(vColor.rgb, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
   float litW = max(step(0.05, vColor.r - vColor.b), step(seedW, 0.22));
-  totalEmissiveRadiance += uNight * litW * ${WARM} * 1.5;
+  totalEmissiveRadiance += uNight * litW * ${WARM} * (0.45 + 0.7 * fract(seedW * 37.0));
   #endif`);
   };
   mat.customProgramCacheKey = () => 'vd7litVert';

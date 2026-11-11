@@ -93,17 +93,19 @@ export function buildCar(id, spec, color = spec.color) {
   for (const z of [L / 2 + 0.005, -L / 2 - 0.005]) { const t = new THREE.BoxGeometry(0.46, 0.11, 0.02); t.translate(0, pr.bot + 0.14, z); lg.push(colored(t, '#e9e6dc')); }
   const lights = new THREE.Mesh(mergeGeometries(lg.map(strip)), m.lights); body.add(lights);
   // v0.7: frecce (indicatori di direzione) ai 4 angoli + ripetitori sui fianchi. Una sola mesh: il lato è nel vertex color (r=1 sinistra).
-  const bg = []; const bw = 0.09;
+  const bg = [];
   for (const sx of [-1, 1]) {
     const side = sx > 0 ? 1 : 0; // l'auto guarda +z: la sua sinistra è +x
-    const f = new THREE.BoxGeometry(bw, 0.07, 0.05); f.translate(sx * (W / 2 - 0.06), pr.light - 0.01, L / 2 - 0.015); bg.push(colored(f, side ? '#ffffff' : '#000000'));
-    const r = new THREE.BoxGeometry(bw, 0.07, 0.05); r.translate(sx * (W / 2 - 0.06), pr.light - 0.05, -L / 2 + 0.015); bg.push(colored(r, side ? '#ffffff' : '#000000'));
-    const rp = new THREE.BoxGeometry(0.02, 0.04, 0.12); rp.translate(sx * (W / 2 + 0.012), pr.bot + 0.42, L * 0.3); bg.push(colored(rp, side ? '#ffffff' : '#000000'));
+    // sotto i fari/fanali, alla stessa x (gli angoli smussati della scocca nasconderebbero un indicatore sul bordo)
+    const lw = Math.min(0.32, W * 0.18);
+    const f = new THREE.BoxGeometry(lw * 0.8, 0.07, 0.05); f.translate(sx * (W / 2 - lw / 2 - 0.12), pr.light - 0.085, L / 2 - 0.015); bg.push(colored(f, side ? '#ffffff' : '#000000'));
+    const r = new THREE.BoxGeometry(lw * 0.8, 0.07, 0.05); r.translate(sx * (W / 2 - lw / 2 - 0.1), pr.light - 0.045, -L / 2 + 0.015); bg.push(colored(r, side ? '#ffffff' : '#000000'));
+    const rp = new THREE.BoxGeometry(0.03, 0.05, 0.16); rp.translate(sx * (W / 2 + 0.015), pr.bot + 0.42, L * 0.3); bg.push(colored(rp, side ? '#ffffff' : '#000000'));
   }
   const blinkU = { uL: { value: 0 }, uR: { value: 0 } };
   const blinkM = new THREE.MeshBasicMaterial({ vertexColors: true });
   blinkM.onBeforeCompile = (sh) => { sh.uniforms.uL = blinkU.uL; sh.uniforms.uR = blinkU.uR;
-    sh.fragmentShader = 'uniform float uL;\nuniform float uR;\n' + sh.fragmentShader.replace('#include <color_fragment>', 'float onB = vColor.r > 0.5 ? uL : uR; diffuseColor.rgb = mix(vec3(0.42, 0.24, 0.06), vec3(1.0, 0.6, 0.1) * 1.6, onB);'); };
+    sh.fragmentShader = 'uniform float uL;\nuniform float uR;\n' + sh.fragmentShader.replace('#include <color_fragment>', 'float onB = vColor.r > 0.5 ? uL : uR; diffuseColor.rgb = mix(vec3(0.42, 0.24, 0.06), vec3(1.0, 0.55, 0.05) * 2.4, onB);'); };
   blinkM.customProgramCacheKey = () => 'vd7blink';
   const blink = new THREE.Mesh(mergeGeometries(bg.map(strip)), blinkM); blink.visible = false; body.add(blink); // visibile solo con le frecce inserite: 0 draw call in più a riposo
   // plastiche: paraurti, minigonne, specchietti, griglia, maniglie

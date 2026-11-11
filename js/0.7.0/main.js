@@ -1587,7 +1587,7 @@ function updateDriveUI() {
   if (!car) return; const v = fwdSpeed(car); const stopped = Math.abs(v) < 1;
   const k = kmh(car); const run = state.jobs && state.jobs.courier;
   const lim = run && !run.spoiled ? `<span class="lim ${k > A.COURIER_KMH ? 'over' : k > A.COURIER_KMH - 5 ? 'near' : ''}">36</span>` : '';
-  $('speedo').innerHTML = `<i class="ind l ${drv.blink === 'L' || drv.blink === 'H' ? 'act' : ''}">◀</i><b>${k}</b> km/h <span class="gear ${drv.gearR ? 'r' : ''}">${drv.gearR ? 'R' : 'D'}</span>${lim}<i class="ind r ${drv.blink === 'R' || drv.blink === 'H' ? 'act' : ''}">▶</i>`;
+  $('speedo').innerHTML = `<i class="tind l ${drv.blink === 'L' || drv.blink === 'H' ? 'lit' : ''}">◀</i><b>${k}</b> km/h <span class="gear ${drv.gearR ? 'r' : ''}">${drv.gearR ? 'R' : 'D'}</span>${lim}<i class="tind r ${drv.blink === 'R' || drv.blink === 'H' ? 'lit' : ''}">▶</i>`;
   $('dBlinkL').classList.toggle('on', drv.blink === 'L'); $('dBlinkR').classList.toggle('on', drv.blink === 'R'); $('dHazard').classList.toggle('on', drv.blink === 'H');
   $('speedo').classList.toggle('over', !!(run && !run.spoiled && k > A.COURIER_KMH));
   const g = $('dGear'); g.textContent = drv.gearR ? 'R → D' : 'D → R'; g.disabled = !stopped; g.classList.toggle('dim', !stopped);

@@ -228,7 +228,7 @@ await run('v7 frecce', async () => {
   await sleep(500); await hud('in auto con frecce');
   const L = await ev(async () => { const v = window.__vd; v.setBlinker('L'); await new Promise((r) => setTimeout(r, 700)); const m = v.world.scene.children.find((o) => o.isGroup && o.userData.blinkU && o.visible && o.userData.blinkOn);
     const seen = new Set(); for (let i = 0; i < 16; i++) { await new Promise((r) => setTimeout(r, 90)); seen.add(m.userData.blinkU.uL.value + ':' + m.userData.blinkU.uR.value); }
-    return { blink: v.blink, btn: document.getElementById('dBlinkL').classList.contains('on'), vis: m.userData.blink.visible, seen: [...seen].sort(), hudArrow: !!document.querySelector('#speedo .ind.l.act') }; });
+    return { blink: v.blink, btn: document.getElementById('dBlinkL').classList.contains('on'), vis: m.userData.blink.visible, seen: [...seen].sort(), hudArrow: !!document.querySelector('#speedo .tind.l.lit') }; });
   ok('freccia sinistra: lampeggia solo a sinistra, tasto acceso, freccia nel tachimetro', L.blink === 'L' && L.btn && L.vis && L.seen.includes('1:0') && L.seen.includes('0:0') && !L.seen.some((x) => x.endsWith(':1')) && L.hudArrow, L);
   const R = await ev(async () => { const v = window.__vd; v.setBlinker('R'); await new Promise((r) => setTimeout(r, 700)); const m = v.world.scene.children.find((o) => o.isGroup && o.userData.blinkOn && o.visible); const seen = new Set();
     for (let i = 0; i < 16; i++) { await new Promise((r) => setTimeout(r, 90)); seen.add(m.userData.blinkU.uL.value + ':' + m.userData.blinkU.uR.value); } return { blink: v.blink, seen: [...seen].sort() }; });

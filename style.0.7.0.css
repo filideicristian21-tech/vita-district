@@ -164,8 +164,8 @@ body.under #underwater{opacity:1}
 #dBlinks .blk.on{background:#ff9a1a;color:#151b20;border-color:#ffd08a}
 #dBlinks .haz{color:#ff6a5a}
 #dBlinks .haz.on{background:#ff4d3d;color:#fff}
-#speedo .ind{font-style:normal;margin:0 8px;color:#ffffff30;transition:none}
-body.blinkOn #speedo .ind.act{color:#ffa21a;text-shadow:0 0 8px #ff9a1a}
+#speedo .tind{font-style:normal;margin:0 8px;color:#ffffff30;transition:none}
+body.blinkOn #speedo .tind.lit{color:#ffa21a;text-shadow:0 0 8px #ff9a1a}
 .house{background:#ffffff0d;border:1px solid #ffffff1f;border-radius:12px;padding:8px 10px;margin:8px 0}
 .house.own{border-color:#9fd3c7aa;background:#9fd3c712}
 .house .hh{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
