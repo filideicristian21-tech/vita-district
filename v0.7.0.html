@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2212%22 fill=%22%23151b20%22/%3E%3Ctext x=%2232%22 y=%2244%22 font-size=%2236%22 text-anchor=%22middle%22 fill=%22%23e6bb70%22%3EV%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#151b20">
+<title>VITA DISTRICT — prototipo v0.7.0</title>
+<link rel="stylesheet" href="./style.0.7.0.css">
+<script type="importmap">{"imports":{"three":"./vendor/three.module.min.js","three/addons/":"./vendor/jsm/"}}</script>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="touch"></div>
+<div id="joyGhost" aria-hidden="true"></div>
+<div id="joy" class="hidden"><div id="joyKnob"></div></div>
+
+<div id="hud">
+  <div id="hudLeft">
+    <div class="chip small" id="verStamp">v0.7.0</div>
+    <div class="chip" id="money">100.000 crediti</div>
+    <div class="chip small" id="clock">☀️ Giorno 1 · 08:00</div>
+    <div class="chip small" id="look">Capelli corti · barba ombra</div>
+    <div class="chip demo hidden" id="demoBadge">DEMO +0 gg</div>
+    <div class="chip small hidden" id="boost">☕ passo svelto</div>
+    <div id="objective" class="hidden"></div>
+  </div>
+  <div id="hudRight">
+    <div id="topBtns">
+      <button id="btnMap" class="pill" aria-label="Mappa">🗺<span class="lbl"> Mappa</span></button>
+      <button id="btnMenu" class="pill" aria-label="Menu">☰<span class="lbl"> Menu</span></button>
+    </div>
+    <canvas id="mini" width="220" height="220" aria-label="Minimappa: tocca per aprire la mappa"></canvas>
+  </div>
+</div>
+<button id="btnAct" class="act hidden">Interagisci</button>
+<!-- Guida (v0.3): sterzo a sinistra, pedali a destra, separati dalla visuale -->
+<div id="drive" aria-label="Comandi auto">
+  <button id="dExit" class="pill dbtn">⏏ Scendi</button>
+  <div id="dSteer"><button id="dLeft" class="dbtn big" aria-label="Sterza a sinistra">◀</button><button id="dRight" class="dbtn big" aria-label="Sterza a destra">▶</button></div>
+  <div id="dBlinks"><button id="dBlinkL" class="dbtn blk" aria-label="Freccia a sinistra">⬅</button><button id="dHazard" class="dbtn blk haz" aria-label="Quattro frecce">⚠</button><button id="dBlinkR" class="dbtn blk" aria-label="Freccia a destra">➡</button></div>
+  <div id="speedo"><b>0</b> km/h</div>
+  <div id="dTop"><button id="dCam" class="pill dbtn">◎ Ricentra</button><button id="dGear" class="pill dbtn">D → R</button></div>
+  <div id="dPedals"><button id="dBrake" class="dbtn big">Frena</button><button id="dGas" class="dbtn big gas">Accelera</button></div>
+</div>
+<button id="unstuck" class="act hidden">↺ Rimetti in strada</button>
+<button id="cRetry" class="act hidden">↺ Riprova la Rotta</button>
+<button id="swStyle" class="act hidden" aria-label="Cambia stile di nuoto">🏊 Rana ▸</button>
+<button id="swDive" class="act hidden">🤿 Immergiti</button>
+<div id="underwater"></div>
+<div id="toast" class="hidden"></div>
+<div id="hint" class="hidden"><span id="hintText"></span><button id="hintNext" class="pill">Ok</button><button id="hintSkip" class="link">Salta</button></div>
+
+<!-- Minigiochi (pesca, basket) -->
+<div id="game" class="hidden" role="dialog" aria-label="Minigioco">
+  <div class="gHead"><b id="gTitle"></b><span id="gScore"></span><button id="gExit" class="pill">✕ Esci</button></div>
+  <div id="gInfo"></div>
+  <div class="gbar" id="gBar"><i id="gZone"></i><i id="gZone2"></i><b id="gMark"></b></div>
+  <button id="gAct" class="act big">Tira</button>
+</div>
+
+<!-- Invito a ruotare (portrait su telefono): non bloccante -->
+<div id="rotate" class="hidden" role="dialog" aria-label="Ruota il telefono">
+  <div class="card center">
+    <div class="phone" aria-hidden="true"></div>
+    <h2>Gira il telefono</h2>
+    <p class="muted">VITA DISTRICT è pensato in orizzontale: più strada visibile e comandi ai lati.<br>Se il blocco rotazione è attivo, disattivalo dal Centro di Controllo.</p>
+    <button id="rotateAnyway" class="pill">Gioca comunque in verticale</button>
+  </div>
+</div>
+
+<!-- Mappa -->
+<div id="mapView" class="overlay hidden" role="dialog" aria-label="Mappa del Rione Marea">
+  <div class="mapHead"><b>Rione Marea</b><span class="muted"> · tocca un luogo per segnarlo</span>
+    <button id="mapCenter" class="pill">◎ Centra su di te</button><button id="mapClose" class="pill">✕ Chiudi</button></div>
+  <div id="mapWrap"><canvas id="bigMap"></canvas><div id="mapMarkers"></div></div>
+  <div id="mapCard" class="card hidden"></div>
+  <div class="legend muted">▲ Tu · ◆ destinazione · grigio scuro = edifici · azzurro = strade</div>
+</div>
+
+<!-- Pannello generico (barbiere, bar, consegne, dialoghi, menu, specchio) -->
+<div id="panel" class="overlay side hidden" role="dialog"><div id="panelBody"></div></div>
+<div id="confirm" class="overlay center hidden" role="alertdialog"><div class="card"><p id="confirmText"></p><div class="row"><button id="confirmNo" class="pill">Annulla</button><button id="confirmYes" class="pill danger">Conferma</button></div></div></div>
+
+<div id="loading"><div><h1>VITA DISTRICT</h1><p>Rione Marea · prototipo web 3D</p><p id="buildStamp">v0.7.0</p><p id="loadMsg" class="muted">Caricamento…</p></div></div>
+<noscript>Serve JavaScript per giocare.</noscript>
+<script type="module" src="./js/0.7.0/main.js"></script>
+</body>
+</html>
