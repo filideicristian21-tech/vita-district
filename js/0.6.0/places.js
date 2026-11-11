@@ -20,4 +20,4 @@ export const PLACES = {
   gelateria: { id: 'gelateria', name: 'Gelateria Nuvola di Limone', short: 'Gelato', icon: '🍦', x: -14, z: 138.4, door: { x: -14, z: 137 }, color: '#f2d36b' },
   dl_fioraio: { id: 'dl_fioraio', name: 'Fioraio dei Limoni — Colle', short: 'Fioraio', icon: '🌼', x: 46, z: 136, door: { x: 46, z: 132.6 }, color: '#f0a3a3', delivery: 'fioraio' },
 };
-export const WORLD_BOUNDS = { minX: BOUNDS.minX, maxX: BOUNDS.maxX, minZ: -190, maxZ: BOUNDS.maxZ };
+export const WORLD_BOUNDS = { minX: BOUNDS.minX, maxX: BOUNDS.maxX, minZ: -236, maxZ: BOUNDS.maxZ }; // v0.6: si vede anche la zona di mare

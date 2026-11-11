@@ -97,6 +97,13 @@ function substep(c, inp, h, world) {
       void ox; void oz;
     }
   }
+  // v0.6: le auto restano sul Lungomare (niente sabbia né mare): limite morbido come un muro, si striscia lungo il bordo
+  if (world && world.carLimit) for (const L of world.carLimit) {
+    for (let k = 0; k < 3; k++) {
+      const cc = carCircles(c)[k];
+      if (cc.x > L.x0 && cc.x < L.x1 && cc.z - cc.r < L.zMin) { c.z += L.zMin - (cc.z - cc.r); if (c.vz < 0) { c.impact = Math.max(c.impact || 0, -c.vz); c.vz = 0; } hit = 1; }
+    }
+  }
   c.autoBrake = !!auto;
   c.wheelRot += (fwdSpeed(c) / (c.spec.wheelR || 0.32)) * h;
   // bloccata: gas premuto ma ferma

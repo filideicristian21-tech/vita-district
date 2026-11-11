@@ -27,6 +27,16 @@ export const LAND5 = [
 ];
 export const SAND5 = [{ x0: -250, x1: -96, z0: -182, z1: -150 }];
 export const BEACH = { x0: -250, x1: -96, z0: -182, z1: -150, flat: -166, edge: -178, low: -0.75 };
+// v0.6: mare nuotabile davanti alla Spiaggia di Ponente (Atlas/Nexus). Livello dell'acqua = y del piano mare in world.js.
+export const SEA = { y: -0.9, x0: -246, x1: -100, buoyZ: -230, wallZ: -231.5, carZ: -149.5, shoreZ: -172 };
+// fondale a tratti lineari (y assoluta). Sopra z -178 resta la sabbia della v0.5 (beachHeight).
+export const SEABED = [[-178, -0.75], [-196, -1.8], [-204, -2.3], [-228, -3.9], [-232, -4.3], [-262, -6.9]];
+export function seabedY(z) {
+  const P = SEABED; if (z >= P[0][0]) return P[0][1];
+  for (let i = 1; i < P.length; i++) if (z >= P[i][0]) { const [z0, y0] = P[i - 1], [z1, y1] = P[i]; return y0 + (y1 - y0) * (z - z0) / (z1 - z0); }
+  return P[P.length - 1][1];
+}
+export const inSwimX = (x) => x > SEA.x0 - 4 && x < SEA.x1 + 4;
 export const PINETA = { x0: -232, x1: -194, z0: 18, z1: 114 };
 export const PIAZZA_LIMONI = { x0: -38, x1: 38, z0: 134, z1: 164 };
 export const LAVAGGIO = { x0: 104, x1: 130, z0: 134, z1: 152, bay: { x: 112, z: 141, yaw: 0 } };
@@ -50,7 +60,8 @@ export const WALLS5 = [
   walls(-400, 168, 178, 400),
   walls(168, 700, 134, 400),
   walls(268, 700, 72.5, 400),
-  walls(-400, -96, -400, -178),
+  walls(-400, -96, -400, -231.5),   // v0.6: prima il muro era a z -178, prima dell'acqua (Cranc). Ora si entra fino alle boe.
+  walls(-400, -246, -400, -150), walls(-100, -96, -400, -178), // lati della zona di mare: scogliera ovest, scogli est
   walls(-96, 700, -400, -177.4),
 ];
 

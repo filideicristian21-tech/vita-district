@@ -5,7 +5,7 @@ import { PLACES } from './places.js';
 import { resolveWorld, rayWorld, buildGrid } from './collide.js';
 import { buildTown, roofHipExport } from './town.js';
 import { GB } from './geo.js';
-import { BEACH } from './layout5.js';
+import { BEACH, SEA } from './layout5.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const TL = new THREE.TextureLoader();
@@ -62,8 +62,20 @@ function planeGeo(w, d, tile) {
 }
 // Acqua: normali animate in coordinate mondo (somma di onde direzionali), riflessi dall'HDR. Niente riflessione planare.
 export const WATER_TIME = { value: 0 };
-export function waterMaterial(color = '#123f4c', { amp = 1, scale = 1, opacity = 1 } = {}) {
-  const m = new THREE.MeshStandardMaterial({ color, roughness: 0.07, metalness: 0.0, envMapIntensity: 1.15, transparent: opacity < 1, opacity });
+// v0.6 (Forge/Spark/Teco): il mare davanti alla spiaggia è trasparente solo dove il fondale è vicino; colore da profondità
+// calcolata dalla stessa funzione del fondale (niente depth texture, niente secondo render). Altrove resta opaco.
+const SEABED_GLSL = `
+float seabedAt(float z) {
+  if (z >= -178.0) return -0.75;
+  if (z >= -196.0) return mix(-0.75, -1.8, (-178.0 - z) / 18.0);
+  if (z >= -204.0) return mix(-1.8, -2.3, (-196.0 - z) / 8.0);
+  if (z >= -228.0) return mix(-2.3, -3.9, (-204.0 - z) / 24.0);
+  if (z >= -232.0) return mix(-3.9, -4.3, (-228.0 - z) / 4.0);
+  return mix(-4.3, -6.9, clamp((-232.0 - z) / 30.0, 0.0, 1.0));
+}`;
+export function waterMaterial(color = '#123f4c', { amp = 1, scale = 1, opacity = 1, shore = false } = {}) {
+  const m = new THREE.MeshStandardMaterial({ color, roughness: 0.07, metalness: 0.0, envMapIntensity: 1.15, transparent: opacity < 1 || shore, opacity });
+  if (shore) m.side = THREE.DoubleSide; // si vede anche da sotto
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = WATER_TIME; sh.uniforms.uAmp = { value: amp }; sh.uniforms.uScale = { value: scale };
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWPw;')
@@ -83,9 +95,23 @@ vec2 wave(vec2 p, vec2 d, float k, float a, float w) { float ph = dot(p, d) * k 
     normal = normalize((viewMatrix * vec4(nW, 0.0)).xyz);
   }`)
       .replace('#include <map_fragment>', `#include <map_fragment>
-  { float dist = length(vViewPosition); diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.75, 0.9, 1.05), smoothstep(30.0, 200.0, dist)); }`);
+  { float dist = length(vViewPosition); diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.75, 0.9, 1.05), smoothstep(30.0, 200.0, dist)); }
+  ${shore ? `{
+    bool zone = vWPw.x > -250.0 && vWPw.x < -96.0 && vWPw.z > -300.0;
+    if (zone) {
+      float d = max(0.0, -0.9 - seabedAt(vWPw.z));
+      vec3 shallow = vec3(0.55, 0.78, 0.72), mid = vec3(0.16, 0.48, 0.52), deep = vec3(0.07, 0.25, 0.33);
+      diffuseColor.rgb = mix(mix(shallow, mid, smoothstep(0.0, 1.2, d)), deep, smoothstep(1.2, 5.0, d));
+      float ndv = abs(normalize(cameraPosition - vWPw).y); float fres = pow(1.0 - ndv, 3.0);
+      diffuseColor.a = mix(mix(0.5, 0.9, smoothstep(0.0, 4.0, d)), 0.97, fres); // guardando in giù si vede la sabbia, di taglio il mare è pieno
+      if (!gl_FrontFacing) { diffuseColor.rgb = vec3(0.45, 0.72, 0.74); diffuseColor.a = 0.75; }
+      float foam = (1.0 - smoothstep(0.0, 0.22, d)) * (0.55 + 0.45 * sin(uTime * 1.3 + vWPw.x * 0.4));
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.95, 0.95, 0.92), foam * 0.6); diffuseColor.a = max(diffuseColor.a, foam * 0.7);
+    }
+  }` : ''}`);
+    if (shore) sh.fragmentShader = sh.fragmentShader.replace('vec2 wave(', SEABED_GLSL + '\nvec2 wave(');
   };
-  m.customProgramCacheKey = () => 'water5';
+  m.customProgramCacheKey = () => (shore ? 'water6shore' : 'water5');
   return m;
 }
 function rng(seed) { let s = seed; return () => ((s = (s * 16807) % 2147483647) / 2147483647); }
@@ -126,7 +152,7 @@ export class World {
       return h.y;
     }
     const B = BEACH;
-    if (this.beachHeight && x > B.x0 && x < B.x1 && z < B.flat && z > B.z0 - 10) return this.beachHeight(z);
+    if (this.beachHeight && x > B.x0 && x < B.x1 && z < B.flat && z > -262) return this.beachHeight(z); // v0.6: anche il fondale
     for (const r of this.roads) if (x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1) return r.y || 0;
     return 0.12;
   }
@@ -738,7 +764,7 @@ export class World {
   }
 
   mergeStatic() {
-    const byMat = new Map(); const skip = new Set([this.water, this.barberPole, this.pond, this.net, this.sea, this.roofsV3]);
+    const byMat = new Map(); const skip = new Set([this.water, this.barberPole, this.pond, this.net, this.sea, this.deepBed, this.roofsV3]);
     for (const m of [...this.group.children]) {
       if (!m.isMesh || m.isInstancedMesh || skip.has(m) || Array.isArray(m.material)) continue;
       const g = m.geometry; if (!g.attributes.uv || !g.attributes.normal) continue;
@@ -768,8 +794,11 @@ export class World {
     this.mesh(new THREE.BoxGeometry(190, 0.5, 0.3), this.mats.stone, 0, 0.37, -177.6);
     for (let x = -93; x <= 93; x += 3) this.mesh(new THREE.BoxGeometry(0.1, 0.8, 0.1), rail, x, 0.6, -177.6, { cast: false });
     this.mesh(new THREE.BoxGeometry(200, 3, 0.5), this.mats.stone, 0, -1.4, -178);
-    const sea = new THREE.Mesh(new THREE.PlaneGeometry(2200, 700, 1, 1), waterMaterial('#0f3b48', { amp: 1 }));
-    sea.rotation.x = -Math.PI / 2; sea.position.set(130, -0.9, -528); sea.receiveShadow = false; this.group.add(sea); this.sea = sea;
+    const sea = new THREE.Mesh(new THREE.PlaneGeometry(2200, 700, 1, 1), waterMaterial('#0f3b48', { amp: 1, shore: true }));
+    sea.rotation.x = -Math.PI / 2; sea.position.set(130, -0.9, -528); sea.receiveShadow = false; sea.renderOrder = 2; this.group.add(sea); this.sea = sea;
+    // v0.6: fondale profondo sotto tutto il mare (oltre la sabbia modellata): sott'acqua non c'è mai il vuoto
+    const deepBed = new THREE.Mesh(new THREE.PlaneGeometry(2200, 700, 1, 1), new THREE.MeshStandardMaterial({ color: '#6d7468', roughness: 1 }));
+    deepBed.rotation.x = -Math.PI / 2; deepBed.position.set(130, -7.0, -528); deepBed.receiveShadow = false; this.group.add(deepBed); this.deepBed = deepBed;
     this.mapShapes.push({ type: 'water', x0: -94, x1: 94, z0: -200, z1: -178 });
   }
 
@@ -778,7 +807,35 @@ export class World {
     const pond = new THREE.Mesh(new THREE.PlaneGeometry(w.x1 - w.x0, w.z1 - w.z0), pm); pond.rotation.x = -Math.PI / 2; pond.position.set((w.x0 + w.x1) / 2, 0.1, (w.z0 + w.z1) / 2); this.scene.add(pond);
     const bed = new THREE.Mesh(new THREE.PlaneGeometry(w.x1 - w.x0, w.z1 - w.z0), new THREE.MeshStandardMaterial({ color: '#2a3226', roughness: 1 })); bed.rotation.x = -Math.PI / 2; bed.position.set(pond.position.x, 0.02, pond.position.z); this.scene.add(bed);
     for (const f of this.fountains5 || []) { const m = new THREE.Mesh(new THREE.CircleGeometry(f.r, 24), waterMaterial('#2c5a62', { amp: 0.2, scale: 4 })); m.rotation.x = -Math.PI / 2; m.position.set(f.x, f.y, f.z); this.scene.add(m); }
-    // fondale della spiaggia fino all'orizzonte: la sabbia continua sott'acqua (si vede dal bagnasciuga)
+    this.buildSea6();
+  }
+  // v0.6: boe del limite, scogli e posidonia sul fondale (InstancedMesh: 3 draw call in tutto)
+  buildSea6() {
+    const r = rng(606); const dummy = new THREE.Object3D(); const S = SEA;
+    const buoyPts = [];
+    for (let x = S.x0 + 2; x <= S.x1 - 2; x += 8) buoyPts.push([x, S.buoyZ]);
+    for (let z = -186; z > S.buoyZ; z -= 8) { buoyPts.push([S.x0 + 1, z]); buoyPts.push([S.x1 - 1, z]); }
+    const buoys = new THREE.InstancedMesh(new THREE.SphereGeometry(0.42, 12, 8), new THREE.MeshStandardMaterial({ color: '#d4482c', roughness: 0.5 }), buoyPts.length);
+    buoyPts.forEach(([x, z], i) => { dummy.position.set(x, S.y + 0.12, z); dummy.scale.set(1, 0.8, 1); dummy.updateMatrix(); buoys.setMatrixAt(i, dummy.matrix); });
+    buoys.castShadow = false; this.scene.add(buoys); this.buoys = buoys; this.buoyPts = buoyPts;
+    // scogli: due gruppi ai lati della spiaggia + uno scoglio isolato che esce dall'acqua (meta di nuoto)
+    const rocks = [];
+    for (let i = 0; i < 7; i++) rocks.push([-244 + r() * 8, -182 - r() * 22, 1 + r() * 1.6]);
+    for (let i = 0; i < 6; i++) rocks.push([-104 + r() * 6, -181 - r() * 14, 0.8 + r() * 1.2]);
+    rocks.push([-215, -218, 2.2]);
+    for (let i = 0; i < 10; i++) rocks.push([S.x0 + 10 + r() * (S.x1 - S.x0 - 20), -206 - r() * 22, 0.4 + r() * 0.5]); // sassi sommersi
+    const rg = new THREE.DodecahedronGeometry(1, 1); { const p = rg.attributes.position; for (let i = 0; i < p.count; i++) { const k = 0.82 + 0.3 * Math.abs(Math.sin(p.getX(i) * 5.1 + p.getZ(i) * 3.7)); p.setXYZ(i, p.getX(i) * k, p.getY(i) * k * 0.75, p.getZ(i) * k); } rg.computeVertexNormals(); }
+    const rockM = new THREE.InstancedMesh(rg, new THREE.MeshStandardMaterial({ color: '#6b665c', roughness: 0.95 }), rocks.length);
+    rocks.forEach(([x, z, s], i) => { const y = this.groundHeight(x, z); dummy.position.set(x, y + s * 0.25, z); dummy.scale.setScalar(s); dummy.rotation.set(r(), r() * 6, r()); dummy.updateMatrix(); rockM.setMatrixAt(i, dummy.matrix);
+      if (y + s * 0.95 > S.y - 0.3) this.circles.push({ x, z, r: s * 0.85 }); }); // solo quelli che arrivano al pelo dell'acqua bloccano
+    rockM.castShadow = true; rockM.receiveShadow = true; this.scene.add(rockM); this.rocks = rockM;
+    // posidonia: ciuffi sottili a gruppi oltre i 2 m di profondità
+    const weed = []; for (let c = 0; c < 9; c++) { const cx = S.x0 + 12 + r() * (S.x1 - S.x0 - 24), cz = -205 - r() * 24; for (let k = 0; k < 9; k++) weed.push([cx + (r() - 0.5) * 5, cz + (r() - 0.5) * 5, 0.5 + r() * 0.7]); }
+    const wg = new THREE.ConeGeometry(0.07, 1, 4, 1, true); wg.translate(0, 0.5, 0);
+    const weedM = new THREE.InstancedMesh(wg, new THREE.MeshStandardMaterial({ color: '#3e5a3a', roughness: 0.9, side: THREE.DoubleSide }), weed.length);
+    weed.forEach(([x, z, h], i) => { dummy.position.set(x, this.groundHeight(x, z), z); dummy.rotation.set((r() - 0.5) * 0.4, r() * 6, (r() - 0.5) * 0.4); dummy.scale.set(1, h, 1); dummy.updateMatrix(); weedM.setMatrixAt(i, dummy.matrix); });
+    this.scene.add(weedM); this.weed = weedM;
+    this.mapShapes.push({ type: 'water', x0: -250, x1: -96, z0: -236, z1: -178.5 });
   }
   // Lampioni (GLB Poly Haven, istanziati) e auto parcheggiate (GLB CC0, tinte per istanza) dei quartieri v0.4/v0.5.
   async buildTownProps() {

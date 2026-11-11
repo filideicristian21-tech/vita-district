@@ -150,3 +150,9 @@ body.driving #look,body.driving #demoBadge{display:none}
 #speedo.over{box-shadow:0 0 0 2px #c0392b}
 #cRetry{position:fixed;z-index:13;left:50%;right:auto;transform:translateX(-50%);bottom:calc(var(--sa-b) + 116px)}
 body:not(.driving) #cRetry{bottom:calc(var(--sa-b) + 96px)}
+/* v0.6: nuoto — i tasti stile/immersione sostituiscono «Interagisci» in acqua */
+#swStyle{bottom:calc(var(--sa-b) + 22px)}
+#swDive{bottom:calc(var(--sa-b) + 96px);min-width:118px;font-size:15px}
+body.swimming #btnAct{display:none}
+#underwater{position:fixed;inset:0;pointer-events:none;z-index:2;background:radial-gradient(ellipse at 50% 40%,#2a8a8a22 0%,#0d4a5266 70%,#082f3899 100%);opacity:0;transition:opacity .25s}
+body.under #underwater{opacity:1}

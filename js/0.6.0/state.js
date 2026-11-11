@@ -424,6 +424,8 @@ function copyJobs(src) {
   if (Array.isArray(src.courierPaid)) jobs.courierPaid = src.courierPaid.filter((id) => id === 'belvedere');
   if (Array.isArray(src.boccePaid)) jobs.boccePaid = src.boccePaid.filter((id) => Number.isFinite(id)).slice(-40); // v0.5 (Ledger): si tengono gli ULTIMI 40 id, non i primi
   if (src.seen5 === true) jobs.seen5 = true;
+  if (src.seen6 === true) jobs.seen6 = true; // v0.6: campi facoltativi, lo schema resta 4 (la v0.5 li ignora)
+  if (src.swimHint === true) jobs.swimHint = true;
   if (src.album && typeof src.album === 'object') {
     for (const id of ['faro', 'giardini']) {
       const score = src.album[id] && src.album[id].score;

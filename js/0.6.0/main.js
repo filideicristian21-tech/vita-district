@@ -12,7 +12,8 @@ import { buildCar, setWheels, setShiny } from './carmodel.js';
 import { DIALOGS, dialogHTML } from './dialog.js';
 import * as A from './activities.js';
 import { LAYOUT } from './layout.js';
-import { LAYOUT5 } from './layout5.js';
+import { LAYOUT5, SEA, seabedY, inSwimX } from './layout5.js';
+import { applySwimPose, SWIM, SWIM_STYLES, swimRoll, swimSurge, waterState } from './rig.js';
 
 const $ = (id) => document.getElementById(id);
 const storage = (() => { try { const t = '__vd_test'; localStorage.setItem(S.KEY_PREFIX + t, '1'); localStorage.removeItem(S.KEY_PREFIX + t); return localStorage; } catch { return null; } })();
@@ -158,6 +159,7 @@ async function boot() {
   if (!state.tutorialDone) startTutorial();
   else if (!state.jobs.seen5 && status !== 'migrated') setTimeout(() => toast('Novità v0.5: a ovest la Contrada Salina con la spiaggia, a nord il Colle dei Limoni col campanile.', 6500), 1200);
   if (!state.jobs.seen5) { state.jobs.seen5 = true; markDirty(); }
+  if (!state.jobs.seen6) { state.jobs.seen6 = true; markDirty(); setTimeout(() => toast('Novità v0.6: alla Spiaggia di Ponente si entra in mare e si nuota (libero, rana, dorso, sott\'acqua).', 6500), status === 'migrated' ? 9000 : 8000); }
   refreshHUD();
   requestAnimationFrame(loop);
 }
@@ -354,7 +356,7 @@ function interactables() {
 let nearest = null;
 function updateInteract() {
   const p = player.root.position; nearest = null; let best = 1e9;
-  if (driving) { $('btnAct').classList.add('hidden'); return; }
+  if (driving || swimming()) { $('btnAct').classList.add('hidden'); return; }
   for (const it of interactables()) {
     const d0 = Math.hypot(p.x - it.x, p.z - it.z);
     const d = d0 + (it.bias || 0); // v0.5: l'auto cede il tasto a chi è vicino (es. «Controllo bulloni» in officina)
@@ -592,7 +594,7 @@ function openMenu() {
    <h3>Comandi</h3><small>${matchMedia('(pointer:coarse)').matches ? 'Pollice sinistro: cammina (fino al bordo = corsa). Pollice destro: gira la visuale. Tasto in basso a destra: interagisci. In auto: ◀ ▶ a sinistra, Frena/Accelera a destra, D/R da fermi, Scendi in alto a sinistra.' : 'WASD/frecce, Shift corsa, trascina col mouse, rotella zoom, E interagisci, M mappa, Esc menu. In auto: W gas, S freno (tenuto da fermi = retromarcia), A/D sterzo, C ricentra, E scendi.'}</small>
    <div class="row"><button class="pill" id="mTut">Rivedi guida</button><button class="pill" id="mStuck">🧭 Sono bloccato</button>${document.fullscreenEnabled ? '<button class="pill" id="mFull">⛶ Schermo intero</button>' : ''}<button class="pill danger" id="mReset">Elimina progressi…</button></div>
    <h3>Crediti e licenze</h3><small>three.js (MIT). Personaggi: Quaternius (CC0). Texture e cielo: ambientCG, Poly Haven (CC0). Lampioni e cespugli: Poly Haven (CC0). Auto: Quaternius, RGS_Dev (CC0). Tegole, sabbia, mattoni, intonaco: Poly Haven (CC0). Volti, abiti, vetrine, alberi, insegne, mare e campanile: procedurali. Dettagli in README.md / LICENSES.md.</small><br>
-   <small>Prototipo v0.5.0 · grafica web più curata, pensata per il telefono. Auto e marchi inventati. iPhone reale non verificato.</small>`);
+   <small>Prototipo v0.6.0 · mare nuotabile, grafica web più curata, pensata per il telefono. Auto e marchi inventati. iPhone reale non verificato.</small>`);
   $('mResume').onclick = () => closeAll();
   $('mSave').onclick = () => { state.player = playerPose(); toast(saveNow() ? 'Salvato in questo browser.' : 'Salvataggio non riuscito.'); };
   $('mMirror').onclick = () => { paused = false; openMirror(); };
@@ -982,7 +984,8 @@ const clock = new THREE.Clock();
 const tmpV = new THREE.Vector3(), camTarget = new THREE.Vector3(), camPos = new THREE.Vector3(), headPos = new THREE.Vector3(), camTargetSm = new THREE.Vector3();
 let settleTimer = 0, saveTimer = 0, hudTimer = 0, miniTimer = 0, fpsAcc = 0, fpsN = 0, lowFps = 0, camInit = false;
 let groundY = 0.12;
-function playerPose() { if (driving) return { ...footPose }; const p = player.root.position; return { x: +p.x.toFixed(3), z: +p.z.toFixed(3), yaw: +player.root.rotation.y.toFixed(3) }; }
+function playerPose() { if (driving) return { ...footPose }; const p = player.root.position; const wet = depthAt(p.x, p.z) > 0.3; // mai salvare in acqua (Guard/Nexus): si riparte sulla battigia
+  return { x: +p.x.toFixed(3), z: +(wet ? SEA.shoreZ : p.z).toFixed(3), yaw: +player.root.rotation.y.toFixed(3) }; }
 function settle() { S.settleGrowth(state, Date.now()); player.setGrooming(S.visibleLengths(state)); markDirty(); refreshHUD(); }
 const lerpAngle = (a, b, k) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * k;
 
@@ -1012,10 +1015,16 @@ function loop() {
   const moving = driving ? false : updatePlayer(dt);
   if (!moving && !sitting && !game && player.current && /Walk|Run/.test(player.current.getClip().name)) player.play('Idle');
   const gy = world.groundHeight(p.x, p.z); groundY += (gy - groundY) * Math.min(1, dt * 12); p.y = sitting ? 0.12 : groundY;
+  if (!driving && swim.w > 0.001) { // a nuoto i fianchi stanno sotto il pelo dell'acqua, con un piccolo dondolio
+    const st = swim.style === 'sott' ? SWIM.sott : Math.hypot(swim.vx, swim.vz) > 0.25 ? SWIM[swim.style] : SWIM.fermo;
+    swim.yS = swim.yS === undefined ? groundY : swim.yS; const want = SEA.y - HIP - st.depth + Math.sin(t * 1.6) * 0.04;
+    swim.yS += (want - swim.yS) * Math.min(1, dt * (swim.style === 'sott' ? 1.5 : 4));
+    p.y = THREE.MathUtils.lerp(groundY, Math.max(swim.yS, groundY - 0.3), swim.w);
+  } else swim.yS = undefined;
   carryBox.visible = !!state.delivery && !game;
   if (driving) { carMesh.position.set(car.x, groundY - 0.12 + 0.02, car.z); carMesh.rotation.y = car.yaw; }
 
-  if (!paused) { if (!driving) player.update(dt); cullNPCs(); for (const n of npcs) { if (n.walk) walkNPC(n, dt); if (n.root.visible) n.update(dt); } }
+  if (!paused) { if (!driving) { player.update(dt); swimVisual(dt); } cullNPCs(); for (const n of npcs) { if (n.walk) walkNPC(n, dt); if (n.root.visible) n.update(dt); } }
   if (world.water) world.water.material.opacity = 0.82 + Math.sin(t * 2) * 0.03;
   if (world.barberPole) world.barberPole.rotation.y += dt * 1.5;
   if (game && game.kind === 'fish') fishUpdate(t);
@@ -1057,12 +1066,14 @@ function loop() {
     // smorzamento input camera
     const k = Math.min(1, dt * 14); cam.sYaw = lerpAngle(cam.sYaw, cam.yaw, k); cam.sPitch += (cam.pitch - cam.sPitch) * k;
     camTarget.set(p.x, p.y + (portrait ? 1.5 : 1.45), p.z);
+    if (swim.w > 0.01) camTarget.y = THREE.MathUtils.lerp(camTarget.y, swim.style === 'sott' ? p.y + HIP + 0.3 : SEA.y + 0.5, swim.w); // a nuoto la camera guarda la testa, non i piedi
     if (!camInit) { camTargetSm.copy(camTarget); camInit = true; } else camTargetSm.lerp(camTarget, Math.min(1, dt * 10));
     // spalla: leggero spostamento a destra per vedere la strada davanti
     const side = portrait ? 0 : 0.38; const rx = Math.cos(cam.sYaw), rz = -Math.sin(cam.sYaw);
     const tgt = tmpV.set(camTargetSm.x - rx * side, camTargetSm.y, camTargetSm.z - rz * side);
-    const cp = Math.cos(cam.sPitch); const dir = camPos.set(Math.sin(cam.sYaw) * cp, Math.sin(cam.sPitch), Math.cos(cam.sYaw) * cp);
-    const want = game ? (game.kind === 'basket' ? 3.0 : 4.2) : cam.dist;
+    const pitchUse = swim.style === 'sott' && swim.w > 0.5 ? Math.min(cam.sPitch, 0.08) : cam.sPitch; // in immersione la camera resta sott'acqua
+    const cp = Math.cos(pitchUse); const dir = camPos.set(Math.sin(cam.sYaw) * cp, Math.sin(pitchUse), Math.cos(cam.sYaw) * cp);
+    const want = (game ? (game.kind === 'basket' ? 3.0 : 4.2) : cam.dist) + 0.6 * swim.w;
     let free = world.rayDistance(tgt, dir, want + 0.3) - 0.3;
     const maxByGround = dir.y < 0 ? (tgt.y - 0.25) / -dir.y : 1e9;
     free = Math.max(0.6, Math.min(free, maxByGround, want));
@@ -1070,6 +1081,7 @@ function loop() {
     camera.position.copy(tgt).addScaledVector(dir, cam.curDist);
     if (game && game.kind === 'basket') camera.lookAt(world.hoop.x, world.hoop.y - 0.6, world.hoop.z); else camera.lookAt(tgt);
   }
+  underwaterFx();
   // sole che segue il giocatore (ombre nitide solo vicino), agganciato a griglia per evitare sfarfallio
   const sx = Math.round(p.x / 2) * 2, sz = Math.round(p.z / 2) * 2;
   sun.position.set(sx + SUN_DIR.x * 60, SUN_DIR.y * 60, sz + SUN_DIR.z * 60); sun.target.position.set(sx, 0, sz);
@@ -1089,37 +1101,121 @@ function loop() {
   gateBeaconUpdate(t);
   renderer.render(scene, camera);
 }
+// ---------- v0.6: a piedi, in acqua bassa e a nuoto ----------
+// Profondità = livello del mare − fondale (stessa funzione usata dalla mesh). Solo davanti alla Spiaggia di Ponente.
+function depthAt(x, z) { return inSwimX(x) && z < -168 ? Math.max(0, SEA.y - world.groundHeight(x, z)) : 0; }
+const swim = { state: 'walk', style: 'rana', ph: 0, w: 0, vx: 0, vz: 0, dive: false, told: {}, roll: 0 };
+let walkSpeed = 0, lastYaw = 0, leanSm = 0, rollSm = 0;
+function swimming() { return swim.state === 'swim'; }
+// sott'acqua: nebbia verde-azzurra corta, sfondo in tinta, vignetta CSS (niente post-process). Tornando su si ripristina tutto.
+const FOG0 = { color: scene.fog.color.clone(), near: scene.fog.near, far: scene.fog.far }; let fxUnder = false, bg0 = null;
+function underwaterFx() {
+  const c = camera.position; const under = c.y < SEA.y - 0.05 && inSwimX(c.x) && c.z < -178.5;
+  if (under === fxUnder) return; fxUnder = under; document.body.classList.toggle('under', under);
+  if (under) { bg0 = scene.background; scene.fog.color.set('#1e5a63'); scene.fog.near = 1; scene.fog.far = 24; scene.background = scene.fog.color; }
+  else { scene.fog.color.copy(FOG0.color); scene.fog.near = FOG0.near; scene.fog.far = FOG0.far; scene.background = bg0; }
+}
 function updatePlayer(dt) {
   const p = player.root.position;
   let moving = false;
+  const depth = depthAt(p.x, p.z);
+  const prevState = swim.state;
+  swim.state = driving ? 'walk' : waterState(swim.state, depth);
+  if (swim.state !== prevState) onWaterChange(prevState, swim.state);
+  const inSwim = swim.state === 'swim';
+  swim.w += ((inSwim ? 1 : 0) - swim.w) * Math.min(1, dt / 0.35 * 2.2); // transizione ~0,35 s
   if (!uiOpen && !paused && !game) {
     const km = keyMove();
     let mx = input.mx + km.x, mz = input.mz + km.z; const mag = Math.min(1, Math.hypot(mx, mz));
+    const ang = Math.atan2(mx, mz) + cam.yaw; // relativo alla camera
+    if (inSwim) {
+      const st = SWIM[mag > 0.12 ? swim.style : 'fermo'] || SWIM.rana;
+      const want = mag > 0.12 ? st.speed * Math.max(0.45, mag) * swimSurge(swim.style, swim.ph) : 0;
+      const tx = Math.sin(ang) * want, tz = Math.cos(ang) * want; const k = 1 - Math.exp(-2.5 * dt); // inerzia dell'acqua
+      swim.vx += (tx - swim.vx) * k; swim.vz += (tz - swim.vz) * k;
+      // boe: oltre si viene spinti dolcemente verso riva (mai un muro secco, mai pericolo)
+      if (p.z < SEA.buoyZ + 4) { swim.vz += (SEA.buoyZ + 4 - p.z) * 0.9 * dt; if (!swim.told.buoy) { swim.told.buoy = 1; toast('Le boe segnano il limite. Da qui si torna verso riva.'); } }
+      else if (p.z > SEA.buoyZ + 12) swim.told.buoy = 0;
+      const x0 = p.x, z0 = p.z; p.x += swim.vx * dt; p.z += swim.vz * dt; world.resolve(p, 0.4, SEA.y - 0.2);
+      const moved = Math.hypot(p.x - x0, p.z - z0);
+      if (mag > 0.12) { let dy = ang - player.root.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); player.root.rotation.y += dy * Math.min(1, dt * 3); }
+      const cps = (mag > 0.12 ? SWIM[swim.style] : SWIM.fermo).cps * (0.7 + 0.5 * Math.min(1, moved / Math.max(dt, 1e-4) / 1.2));
+      swim.ph = (swim.ph + dt * cps) % 1;
+      if (player.loco) player.locomote(dt, 0, 0); else player.play('Idle');
+      moving = moved > 0.002; if (moving) markDirty();
+      return moving;
+    }
     if (mag > 0.12) {
       if (sitting) standUp();
-      const ang = Math.atan2(mx, mz) + cam.yaw; // relativo alla camera
-      const run = input.run || km.run;
-      let speed = (run ? 4.6 : 1.55 + 0.6 * mag) * (boostUntil > performance.now() ? 1.25 : 1);
-      if (!run) speed *= Math.max(0.5, mag);
-      const dx = Math.sin(ang) * speed * dt, dz = Math.cos(ang) * speed * dt;
+      const run = (input.run || km.run) && swim.state !== 'wade';
+      let target = (run ? 4.6 : 1.55 + 0.6 * mag) * (boostUntil > performance.now() ? 1.25 : 1);
+      if (!run) target *= Math.max(0.5, mag);
+      if (swim.state === 'wade') target *= THREE.MathUtils.lerp(1, 0.55, THREE.MathUtils.clamp((depth - 0.35) / 0.7, 0, 1)); // acqua alle ginocchia/fianchi
+      else if (inSwimX(p.x) && p.z < -150 && p.z > -178) target *= 0.85; // sabbia asciutta un po' più lenta (Cranc)
+      // curve strette: rallenta finché il corpo non è girato (niente scivolata laterale)
+      let dy = ang - player.root.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      target *= THREE.MathUtils.lerp(0.35, 1, Math.max(0, Math.cos(dy)));
+      walkSpeed += (target - walkSpeed) * Math.min(1, dt * (target > walkSpeed ? 3.5 : 6)); // ~0,3 s per partire, ~0,2 per fermarsi
+      const dx = Math.sin(ang) * walkSpeed * dt, dz = Math.cos(ang) * walkSpeed * dt;
       const x0 = p.x, z0 = p.z;
       p.x += dx; p.z += dz; world.resolve(p, 0.32, groundY);
       const moved = Math.hypot(p.x - x0, p.z - z0);
-      let dy = ang - player.root.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
       player.root.rotation.y += dy * Math.min(1, dt * 9);
-      if (moved < 0.004) player.play('Idle');
-      else {
-        const actual = moved / Math.max(dt, 1e-4);
-        const running = actual > 3.15;
-        player.play(running ? 'Run' : 'Walk');
-        const a = player.actions[running ? 'Run' : 'Walk'];
-        if (a) a.timeScale = running ? THREE.MathUtils.clamp(actual / 4.6, 0.7, 1.35) : THREE.MathUtils.clamp(actual / 1.55, 0.45, 1.35);
-        moving = true;
-      }
+      player.locomote(dt, moved / Math.max(dt, 1e-4), moved);
+      moving = moved > 0.004;
       markDirty();
+    } else {
+      walkSpeed = 0;
+      if (!sitting && player.loco) player.locomote(dt, 0, 0);
     }
   }
   return moving;
+}
+function onWaterChange(a, b) {
+  if (b === 'swim') {
+    swim.vx = Math.sin(player.root.rotation.y) * 0.6; swim.vz = Math.cos(player.root.rotation.y) * 0.6; swim.dive = false; swim.ph = 0;
+    if (!state.jobs.swimHint) { state.jobs.swimHint = true; markDirty(); toast('Sei in acqua: muovi lo stick per nuotare. Cambia stile col tasto a destra.', 6000); }
+    else toast(`Stile: ${SWIM[swim.style].name}`);
+  }
+  if (a === 'swim' && b !== 'swim') { swim.dive = false; }
+  if (b === 'walk' && a !== 'walk') toast('Di nuovo a terra.', 1600);
+  updateSwimUI();
+}
+function updateSwimUI() {
+  const on = swimming() && !driving;
+  $('swStyle').classList.toggle('hidden', !on); $('swDive').classList.toggle('hidden', !on);
+  if (on) { $('swStyle').textContent = `🏊 ${SWIM[swim.style === 'sott' ? 'rana' : swim.style].name} ▸`; $('swDive').textContent = swim.style === 'sott' ? '⬆ Risali' : '🤿 Immergiti'; }
+  document.body.classList.toggle('swimming', on);
+}
+function cycleSwimStyle() {
+  const order = ['libero', 'rana', 'dorso']; const cur = swim.style === 'sott' ? 'rana' : swim.style;
+  swim.style = order[(order.indexOf(cur) + 1) % order.length]; swim.prevStyle = swim.style; toast(`Stile: ${SWIM[swim.style].name}`, 1500); updateSwimUI();
+}
+function toggleDive() {
+  if (swim.style === 'sott') { swim.style = swim.prevStyle || 'rana'; toast('Risali in superficie.', 1400); }
+  else { if (depthAt(player.root.position.x, player.root.position.z) < 2.2) return toast('Qui è troppo basso per immergersi: vai un po\' più al largo.'); swim.prevStyle = swim.style; swim.style = 'sott'; swim.diveT = 0; toast("Sott'acqua: il fondale è di sabbia. Tocca «Risali» quando vuoi.", 2600); }
+  updateSwimUI();
+}
+$('swStyle').addEventListener('click', cycleSwimStyle);
+$('swDive').addEventListener('click', toggleDive);
+// posa del nuoto: dopo il mixer (sopra l'Idle). Corpo inclinato intorno ai fianchi; testa fuori dall'acqua negli stili di superficie.
+const HIP = 0.98;
+function swimVisual(dt) {
+  const b = player.body; if (!b) return;
+  const w = swim.w; const moving = Math.hypot(swim.vx, swim.vz) > 0.25;
+  const style = moving || swim.style === 'sott' ? swim.style : 'fermo';
+  // corsa: leggera inclinazione in avanti con la velocità e in curva (Study/Nexus), solo a terra
+  const yawRate = (player.root.rotation.y - lastYaw) / Math.max(dt, 1e-4); lastYaw = player.root.rotation.y;
+  const k = player.loco ? player.loco.k : 0; const mv = player.loco ? 1 - player.loco.wI : 0;
+  leanSm += ((0.03 + 0.1 * k) * mv - leanSm) * Math.min(1, dt * 8);
+  rollSm += (THREE.MathUtils.clamp(-yawRate * 0.035 * mv, -0.14, 0.14) - rollSm) * Math.min(1, dt * 8);
+  const pitch = THREE.MathUtils.lerp(leanSm, (SWIM[style] || SWIM.rana).pitch, w);
+  const roll = THREE.MathUtils.lerp(rollSm, swimRoll(style, swim.ph), w);
+  b.rotation.set(pitch, 0, roll, 'XZY');
+  // perno ai fianchi quando nuota, alle caviglie quando corre (si inclina "dalle caviglie")
+  const piv = HIP * w; const c = Math.cos(pitch), s0 = Math.sin(pitch);
+  b.position.set(0, piv - piv * c, -piv * s0); // rotazione intorno al punto (0, piv, 0) invece che ai piedi
+  if (w > 0.01) applySwimPose(player.rig, style, swim.ph, w);
 }
 function walkNPC(n, dt) {
   const w = n.walk; const cur = walkerPos(w);
@@ -1180,7 +1276,8 @@ function gateBeaconUpdate(t) {
   gateBeacon.visible = !!g; if (g) { gateBeacon.position.set(g.x, 0, g.z); gateBeacon.children[0].scale.setScalar(1 + Math.sin(t * 2.5) * 0.05); }
 }
 function obstacles() { const out = []; for (const n of npcs) out.push(n.root.position); return out; }
-const carWorld = () => ({ boxes: world.boxes, circles: world.circles, obstacles: obstacles(), bounds: S.BOUNDS, grid: world.grid, liveCircles: world.liveCircles });
+const CAR_LIMIT = [{ x0: SEA.x0 - 6, x1: SEA.x1 + 4, zMin: SEA.carZ }]; // v0.6 (Atlas): auto ferme a z -149,5 davanti alla spiaggia
+const carWorld = () => ({ boxes: world.boxes, circles: world.circles, obstacles: obstacles(), bounds: S.BOUNDS, grid: world.grid, liveCircles: world.liveCircles, carLimit: CAR_LIMIT });
 function enterCar() {
   if (!parked || driving) return;
   if (sitting) standUp();
@@ -1374,6 +1471,7 @@ if (TEST_HOOK) window.__vd = {
   step(sec) { for (let t = 0; t < sec; t += 1 / 30) updatePlayer(1 / 30); },
   // v0.3
   enterCar, tryExit, unstuck, openDealer, openTalk, recenter, npcs, get driving() { return driving; },
+  swim, depthAt, cycleSwimStyle, toggleDive, SEA, get swimming() { return swimming(); }, get underwater() { return fxUnder; }, CAR_LIMIT,
   get car() { const c = car || parked; return c && { id: state.garage.selected, x: c.x, z: c.z, yaw: c.yaw, v: fwdSpeed(c), kmh: kmh(c), gearR: drv.gearR, stuckT: c.stuckT, steer: c.steer, driving }; },
   setDrive(o) { Object.assign(drv, o); }, keys: input.keys,
   drive(sec, inp) { for (let t = 0; t < sec; t += 1 / 30) { stepCar(car, inp, 1 / 30, carWorld()); } const p = player.root.position; p.x = car.x; p.z = car.z; },

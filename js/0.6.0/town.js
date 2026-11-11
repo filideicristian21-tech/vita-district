@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { GB, faces, hex, rng } from './geo.js';
 import { LAYOUT as EAST } from './layout.js';
-import { LAYOUT5, FILL_EAST, BEACH, PINETA, PIAZZA_LIMONI, LAVAGGIO, KIOSK, WALLS5 } from './layout5.js';
+import { LAYOUT5, FILL_EAST, BEACH, PINETA, PIAZZA_LIMONI, LAVAGGIO, KIOSK, WALLS5, SEA, seabedY } from './layout5.js';
 
 const CELL = 80; // v0.5: 80 m (con 48 m le draw call al centro erano ~300)
 const BASE = 0.12;
@@ -243,13 +243,18 @@ export function buildTown(world) {
 
   // --- spiaggia: sabbia in pendenza fino al mare ---
   {
-    const B = BEACH; const nx = 32, nz = 18;
-    const hAt = (z) => z >= B.flat ? BASE : z >= B.edge ? BASE + (B.low - BASE) * (B.flat - z) / (B.flat - B.edge) : B.low - (B.edge - z) * 0.11;
+    // v0.6: la sabbia continua sott'acqua fino a z -262 (fondale vero, niente vuoto sotto il mare)
+    const B = BEACH; const nx = 32; const ZS = -262;
+    // righe allineate ai cambi di pendenza: la mesh e groundHeight() coincidono al centimetro
+    const zs = [...new Set([...Array.from({ length: 29 }, (_, k) => B.z1 - k * 4), B.flat, B.edge, -196, -204, -228, -232, ZS].map((z) => Math.max(ZS, z)))].sort((a, b) => a - b);
+    const nz = zs.length - 1;
+    const hAt = (z) => z >= B.flat ? BASE : z >= B.edge ? BASE + (B.low - BASE) * (B.flat - z) / (B.flat - B.edge) : seabedY(z);
     for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
       const x0 = B.x0 + (B.x1 - B.x0) * i / nx, x1 = B.x0 + (B.x1 - B.x0) * (i + 1) / nx;
-      const z0 = -188 + (B.z1 + 188) * j / nz, z1 = -188 + (B.z1 + 188) * (j + 1) / nz;
+      const z0 = zs[j], z1 = zs[j + 1];
       const g = cells.gb((x0 + x1) / 2, (z0 + z1) / 2, 'sand');
-      const col = (z) => { const y = hAt(z); const wet = THREE.MathUtils.smoothstep(-y, 0.25, 0.75); return [0.96 * (1 - 0.38 * wet), 0.88 * (1 - 0.4 * wet), 0.74 * (1 - 0.4 * wet)]; };
+      const col = (z) => { const y = hAt(z); const wet = THREE.MathUtils.smoothstep(-y, 0.25, 0.75); const deep = THREE.MathUtils.clamp((SEA.y - y) / 5, 0, 1);
+        return [0.96 * (1 - 0.38 * wet) * (1 - 0.35 * deep), 0.88 * (1 - 0.4 * wet) * (1 - 0.18 * deep), 0.74 * (1 - 0.4 * wet) * (1 - 0.05 * deep)]; };
       const y0 = hAt(z0), y1 = hAt(z1); const dz = z1 - z0, dy = y1 - y0; const ln = Math.hypot(dz, dy); const nrm = [0, dz / ln, -dy / ln];
       const T = 3;
       const v = this_quadSand(g, x0, x1, z0, z1, y0, y1, nrm, T, col(z0), col(z1));

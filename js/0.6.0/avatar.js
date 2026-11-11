@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { mergeVertices, mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { Rig } from './rig.js';
 
 const loader = new GLTFLoader();
 const cache = new Map();
@@ -130,7 +131,8 @@ export class Avatar {
     const s = height / (box.max.y - box.min.y);
     model.scale.setScalar(s);
     model.position.y = -box.min.y * s;
-    this.root.add(model);
+    // v0.6: gruppo «corpo» tra radice e modello: nuoto (beccheggio/rollio) e inclinazioni della corsa senza toccare la posizione logica
+    this.body = new THREE.Group(); this.root.add(this.body); this.body.add(model);
     this.model = model;
     this.meshes = [];
     model.traverse((o) => {
@@ -164,13 +166,42 @@ export class Avatar {
       const short = clip.name.split('|').pop().replace(/^(Man|Female)_/, '');
       this.actions[short] = this.mixer.clipAction(clip);
     }
+    if (isPlayer) this.rig = new Rig(model, this.body);
     this.play(this.actions.Idle ? 'Idle' : Object.keys(this.actions)[0]);
     if (isPlayer) { this.setupGrooming(); this.setupFace(); }
     else this.setupFace({ npc: true });
     return this;
   }
 
+  // v0.6 (Nexus/Study): camminata e corsa sempre accese insieme, fase guidata dalla DISTANZA percorsa (niente piedi che
+  // scivolano), peso walk→run in base alla velocità reale (2,0–3,6 m/s), idle che sfuma in partenza e in arresto.
+  locomote(dt, speed, moved) {
+    const W = this.actions.Walk, R = this.actions.Run, I = this.actions.Idle; if (!W || !R || !I) return;
+    if (!this.loco) {
+      for (const a of Object.values(this.actions)) if (a !== W && a !== R && a !== I && a.isRunning()) a.fadeOut(0.2);
+      const w0 = this.current === I ? 1 : 0;
+      for (const a of [W, R, I]) { a.reset(); a.enabled = true; a.setEffectiveTimeScale(1); a.play(); }
+      W.timeScale = 0; R.timeScale = 0;
+      this.loco = { phase: 0, wI: 1, wW: 0, wR: 0, k: 0 }; void w0;
+    }
+    const L = this.loco, sm = THREE.MathUtils.smoothstep;
+    const mov = sm(speed, 0.08, 0.7), k = sm(speed, 2.0, 3.6);
+    const r = Math.min(1, dt * 9);
+    L.wI += (1 - mov - L.wI) * r; L.wW += (mov * (1 - k) - L.wW) * r; L.wR += (mov * k - L.wR) * r; L.k = k;
+    const dW = W.getClip().duration, dR = R.getClip().duration;
+    const stride = THREE.MathUtils.lerp(1.55 * dW, 4.6 * dR, k); // metri per ciclo (2 passi) alla velocità naturale delle clip
+    if (moved > 0) L.phase = (L.phase + moved / stride) % 1;
+    else if (L.wW + L.wR > 0.05) { const near = Math.round(L.phase * 2) / 2; L.phase += (near - L.phase) * Math.min(1, dt * 6); } // si chiude il passo, niente gamba a mezz'aria
+    W.time = L.phase * dW; R.time = L.phase * dR;
+    I.setEffectiveWeight(L.wI); W.setEffectiveWeight(L.wW); R.setEffectiveWeight(L.wR);
+    this.current = L.wR > L.wW && L.wR > L.wI ? R : L.wW > L.wI ? W : I;
+  }
   play(name, fade = 0.25) {
+    if (this.loco) {
+      if (/^(Idle|Walk|Run)$/.test(name)) return; // gestite da locomote()
+      for (const a of [this.actions.Walk, this.actions.Run, this.actions.Idle]) if (a) { a.timeScale = 1; a.fadeOut(fade); }
+      this.loco = null; this.current = null;
+    }
     const a = this.actions[name];
     if (!a || this.current === a) return;
     const prev = this.current;

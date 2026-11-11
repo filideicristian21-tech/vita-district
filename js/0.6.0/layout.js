@@ -3,7 +3,7 @@
 
 export const BOUNDS_V4 = { minX: -94, maxX: 514, minZ: -176, maxZ: 74 };
 // v0.5: Ponente a ovest fino a x=-250, Colle dei Limoni a nord fino a z=178, spiaggia fino a z=-182.
-export const BOUNDS = { minX: -250, maxX: 514, minZ: -182, maxZ: 178 };
+export const BOUNDS = { minX: -250, maxX: 514, minZ: -232, maxZ: 178 }; // v0.6: minZ fino alle boe (prima -182)
 
 const RESERVED = [
   [146, 188, -60, -30], // officina

@@ -19,7 +19,7 @@ export const WASH_PRICE = 6;
 export const WASH_SHINE_MS = 24 * 60 * 60 * 1000;
 
 export function emptyJobs() {
-  return { paints: [], checked: {}, courierPaid: [], courier: null, album: {}, boccePaid: [], shells: null, washed: {}, seen5: false };
+  return { paints: [], checked: {}, courierPaid: [], courier: null, album: {}, boccePaid: [], shells: null, washed: {}, seen5: false, seen6: false, swimHint: false };
 }
 
 export function newWorkshop() {
