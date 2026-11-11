@@ -29,3 +29,15 @@ Tutti gli asset sotto sono stati **riusati da cartelle locali di progetti preced
 
 Generati dal codice (nessuna licenza esterna): auto guidabili Vela/Bruma/Pode e Autosalone Miraggio (v0.3, forme originali, nessun logo o marchio reale), parco, molo, faro, dialoghi; capelli/barba procedurali, insegne, palo del barbiere, panchine, fontana, edifici, finestre, mappa.
 Nomi di luoghi e persone (Rione Marea, Tonino, Marta, Rocco, Bice, Ugo) inventati dagli agenti; nessun marchio reale.
+
+## Aggiunte v0.5.0 (anteprima)
+
+Scaricate da Poly Haven (API pubblica, autori letti dalla scheda di ogni asset), ridotte a 512–1024 px. Tutte **CC0 1.0**. Totale nuove texture: circa 600 KB.
+
+| File | Asset | Autore | Fonte | Licenza | Modifiche |
+|---|---|---|---|---|---|
+| assets/tex/roof_albedo.jpg, roof_normal.jpg | Clay Roof Tiles 02 | Amal Kumar | polyhaven.com/a/clay_roof_tiles_02 | CC0 1.0 | 512 px, JPEG |
+| assets/tex/sand_albedo.jpg, sand_normal.jpg | Coast Sand 01 | Rob Tuytel | polyhaven.com/a/coast_sand_01 | CC0 1.0 | 512 px, tinta più calda |
+| assets/tex/facadeatlas_albedo.jpg, facadeatlas_normal.jpg | atlante 2×2: Brick Wall 02 + Plastered Wall 02 + Painted Plaster Wall (gli ultimi due già nel progetto) | Dimitrios Savva (Brick Wall 02); Poly Haven (gli altri, vedi sopra) | polyhaven.com/a/brick_wall_02 | CC0 1.0 | montati in un'unica immagine 1024 px per ridurre i draw call |
+
+Generati dal codice nella v0.5 (nessuna licenza esterna): quartieri nuovi (Spiaggia di Ponente, Lido Conchiglia, Pineta, Piazza dei Limoni, Contrada Salina, Autolavaggio Schiuma), tetti a padiglione, persiane, insegne di negozi inventati, chiosco gelati, conchiglie, finiture delle auto (paraurti, griglia, specchietti). Marchi e nomi sono tutti inventati.
