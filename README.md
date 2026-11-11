@@ -6,6 +6,8 @@ Gioco web 3D (three.js/WebGL) in un piccolo quartiere inventato, il **Rione Mare
 
 La v0.4 è solo un’anteprima locale: `v0.4.0.html`. Non sostituisce `v0.3.0.html`.
 
+La v0.5 è un’anteprima su un ramo a parte (`vita-district-v050`): `v0.5.0.html`. Non sostituisce la v0.3 né la v0.4 e usa lo stesso salvataggio (`vitaDistrict.v1.save`, schema 4) senza cancellare niente. Novità: mappa più grande (spiaggia, pineta, Piazza dei Limoni, Contrada Salina, autolavaggio), grafica web più curata, conchiglie e gelateria, Rotta Sicura più tollerante, meno bug. Test: `node --test test/*.test.mjs` e, con un Chrome, `PUPPETEER=… node test/e2e/e2e-v5.mjs http://127.0.0.1:8765/v0.5.0.html 932 430` (serve un server che metta `TEST_HOOK = true` solo in locale). Non provata su un iPhone vero.
+
 Se il telefono mostra ancora la versione precedente, apri la pagina con i file di questa build: https://filideicristian21-tech.github.io/vita-district/v0.3.0.html — il numero di versione resta visibile in alto a sinistra (`v0.3.0`). La Vela gratuita è sul Porto, davanti alla piazza; l'Autosalone Miraggio è segnato sulla mappa a sud.
 
 ## Cosa aspettarsi
