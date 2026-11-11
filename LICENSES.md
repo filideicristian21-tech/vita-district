@@ -41,3 +41,9 @@ Scaricate da Poly Haven (API pubblica, autori letti dalla scheda di ogni asset),
 | assets/tex/facadeatlas_albedo.jpg, facadeatlas_normal.jpg | atlante 2×2: Brick Wall 02 + Plastered Wall 02 + Painted Plaster Wall (gli ultimi due già nel progetto) | Dimitrios Savva (Brick Wall 02); Poly Haven (gli altri, vedi sopra) | polyhaven.com/a/brick_wall_02 | CC0 1.0 | montati in un'unica immagine 1024 px per ridurre i draw call |
 
 Generati dal codice nella v0.5 (nessuna licenza esterna): quartieri nuovi (Spiaggia di Ponente, Lido Conchiglia, Pineta, Piazza dei Limoni, Contrada Salina, Autolavaggio Schiuma), tetti a padiglione, persiane, insegne di negozi inventati, chiosco gelati, conchiglie, finiture delle auto (paraurti, griglia, specchietti). Marchi e nomi sono tutti inventati.
+
+## Aggiunte v0.6.0 (anteprima)
+
+**Nessun asset nuovo scaricato.** La v0.6 riusa solo i file già elencati sopra; tutto il nuovo è generato dal codice: fondale di sabbia con pendenza, scogli, posidonia, boe, shader del mare (colore per profondità, schiuma a riva, vista da sotto), nebbia subacquea, pose del nuoto (libero, rana, dorso, sott'acqua) calcolate sullo scheletro esistente, scocca arrotondata delle auto, cerchi a razze, pneumatici, abitacolo e linee delle porte, lampione semplificato per la distanza.
+
+**Nota Quaternius (Guard).** Il 28/8/2026 Quaternius è passato dalla CC0 alla Quaternius Asset License (QAL) v1.0 (quaternius.com/license.html). I 6 file Quaternius di questo progetto (5 personaggi e `corallo.glb`) sono copie locali precedenti a quella data e restano registrati come CC0 1.0 (sezione 7 della QAL: gli asset già ottenuti mantengono la licenza di allora). Ogni file Quaternius scaricato **dopo** il 28/8/2026 va scritto qui come **QAL v1.0**, con data e URL, mai come CC0, e non va ridistribuito come pacchetto di soli asset. Nella v0.6 non ne è stato aggiunto nessuno.
