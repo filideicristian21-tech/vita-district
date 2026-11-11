@@ -1140,7 +1140,7 @@ function loop() {
   settleTimer += dt; saveTimer += dt; hudTimer += dt; miniTimer += dt;
   if (settleTimer > 10) { settleTimer = 0; S.settleGrowth(state, Date.now()); if (!(uiOpen && viewMode === 'face')) player.setGrooming(S.visibleLengths(state)); }
   if (saveTimer > 4) { saveTimer = 0; markDirty(); if (dirty) { state.player = playerPose(); saveNow(); } }
-  dnTimer += dt; if (dnTimer > 0.25) { dnTimer = 0; dayNight(); }
+  dnTimer += raw; if (dnTimer > 0.25) { dnTimer = 0; dayNight(); }
   if (driving || headSpot.intensity > 0) headlightFollow();
   if (nightSkyObj && nightSkyObj.stars.visible) { nightSkyObj.stars.position.copy(camera.position); nightSkyObj.moon.position.copy(camera.position).addScaledVector(moonDir, 160); nightSkyObj.moon.lookAt(camera.position); }
   if (hudTimer > 0.25) { hudTimer = 0; if (!uiOpen) refreshHUD(); updateInteract(); document.body.classList.toggle('ui', !!uiOpen || !!sitting); document.body.classList.toggle('driving', driving); }
@@ -1209,7 +1209,7 @@ function houseCard(hid, inAgency = true) {
   const st = own ? (main ? '<b class="ok">Casa principale</b>' : '<b class="ok">Tua</b>') : after >= 0 ? `dopo l'acquisto: ${cr(after)} cr` : `<b class="no">mancano ${cr(-after)} cr</b>`;
   return `<div class="house ${own ? 'own' : ''}"><div class="hh"><b>${esc(h.name)}</b><span>${esc(h.kind)} · ${esc(h.zone)} · ${h.rooms} ${h.rooms === 1 ? 'stanza' : 'stanze'}</span></div>
     <small>${esc(h.desc)}</small><div class="hp"><span class="price">${cr(h.price)} cr</span><span>${st}</span></div>
-    <div class="row">${own ? (main ? '' : `<button class="pill" data-main="${hid}">Rendila principale</button>`) + (H.owned.length > 1 ? `<button class="pill" data-sell="${hid}">Vendi · ${cr(Math.floor(h.price * Life.RESALE))} cr</button>` : '')
+    <div class="row">${own ? (main ? '' : `<button class="pill" data-main="${hid}">Rendila principale</button>`) + (H.owned.length > 1 ? `<button class="pill" data-sell="${hid}">Vendi · ${cr(Math.round(h.price * Life.RESALE))} cr</button>` : '')
       : `<button class="pill primary" data-buy="${hid}" ${after < 0 ? 'disabled' : ''}>Compra · ${cr(h.price)} cr</button>`}${inAgency ? `<button class="pill" data-go="${hid}">◆ Sulla mappa</button>` : ''}</div></div>`;
 }
 function bindHouseButtons(back) {
@@ -1217,7 +1217,7 @@ function bindHouseButtons(back) {
   body.querySelectorAll('[data-buy]').forEach((b) => b.onclick = () => buyHouseFlow(b.dataset.buy, back));
   body.querySelectorAll('[data-main]').forEach((b) => b.onclick = () => { Life.setMainHome(state, b.dataset.main); saveNow(); toast(`Casa principale: ${Life.HOUSES[b.dataset.main].name}. Qui ti risvegli e riparti.`); back(); });
   body.querySelectorAll('[data-sell]').forEach((b) => b.onclick = () => { const id = b.dataset.sell; const h = Life.HOUSES[id];
-    confirmBox(`Vendere ${h.name} per ${cr(Math.floor(h.price * Life.RESALE))} crediti di gioco (70% del prezzo)?`, 'Vendi', () => { const r = Life.sellHouse(state, id); if (!r.ok) return toast(r.reason); world.setHouseSigns(state.life.homes.owned); saveNow(); refreshHUD(); toast(`Venduta: +${cr(r.pay)} crediti.`); back(); }); });
+    confirmBox(`Vendere ${h.name} per ${cr(Math.round(h.price * Life.RESALE))} crediti di gioco (70% del prezzo)?`, 'Vendi', () => { const r = Life.sellHouse(state, id); if (!r.ok) return toast(r.reason); world.setHouseSigns(state.life.homes.owned); saveNow(); refreshHUD(); toast(`Venduta: +${cr(r.pay)} crediti.`); back(); }); });
   body.querySelectorAll('[data-go]').forEach((b) => b.onclick = () => { const h = Life.HOUSES[b.dataset.go]; houseWaypoint(b.dataset.go, h); closeAll(); toast(`◆ ${h.name} segnata sulla mappa.`); });
 }
 function houseWaypoint(id, h) { PLACES['house_' + id] = PLACES['house_' + id] || { id: 'house_' + id, name: h.name, short: h.name, icon: '🏠', x: h.door.x, z: h.door.z, door: h.door, color: '#9fd3c7' }; state.waypoint = 'house_' + id; markDirty(); }

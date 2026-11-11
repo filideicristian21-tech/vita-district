@@ -106,7 +106,7 @@ export function sellHouse(state, id) {
   const H = state.life.homes;
   if (!H.owned.includes(id)) return { ok: false, reason: 'Non è tua.' };
   if (H.owned.length < 2) return { ok: false, reason: 'È la tua unica casa: tienila.' };
-  const pay = Math.floor(HOUSES[id].price * RESALE); H.owned = H.owned.filter((x) => x !== id); state.money += pay;
+  const pay = Math.round(HOUSES[id].price * RESALE); H.owned = H.owned.filter((x) => x !== id); state.money += pay;
   if (H.main === id) H.main = H.owned.reduce((a, b) => (HOUSES[b].price > HOUSES[a].price ? b : a), H.owned[0]);
   return { ok: true, pay };
 }
