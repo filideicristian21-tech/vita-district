@@ -118,3 +118,14 @@ test('v0.3 e v0.4 non toccate rispetto a main', { skip: !fs.existsSync(path.join
   const out = execSync(`git diff --name-only ${base} -- v0.3.0.html v0.4.0.html js/0.3.0 js/0.4.0 style.0.3.0.css style.0.4.0.css`, { cwd: root }).toString().trim();
   assert.equal(out, '', out);
 });
+
+test('bocce: un id vecchio non ripaga anche se uscito dalla lista dei 40', () => {
+  const s = newState(NOW); const m0 = s.money; const th = [{ angle: 0, power: 0.5 }, { angle: 0.1, power: 0.4 }, { angle: -0.1, power: 0.6 }];
+  const first = s.lastOpId + 1;
+  assert.equal(A.claimBocce(s, first, th).reward, 8);
+  for (let i = 1; i <= 45; i++) A.claimBocce(s, first + i, th);
+  s.jobs.boccePaid = s.jobs.boccePaid.slice(-40);
+  assert.equal(s.jobs.boccePaid.includes(first), false);
+  assert.equal(A.claimBocce(s, first, th).ok, false);
+  assert.equal(s.money, m0 + 8 * 46);
+});

@@ -164,10 +164,12 @@ export function bocceDistances(lands) {
 export function claimBocce(state, roundId, throws) {
   if (!Number.isFinite(roundId)) return { ok: false, reason: 'id' };
   if (state.jobs.boccePaid.includes(roundId)) return { ok: true, reward: 0, already: true };
+  // v0.5 (Ledger): la lista dei pagati tiene solo gli ultimi 40, quindi un id vecchio non deve ripagare: l'id deve essere nuovo (> ultima operazione)
+  if (!(roundId > (state.lastOpId || 0))) return { ok: false, reason: 'old' };
   if (!Array.isArray(throws) || throws.length !== 3) return { ok: false, reason: 'throws' };
   if (!throws.every((t) => t && Number.isFinite(t.angle) && Number.isFinite(t.power) && t.power >= 0 && t.power <= 1)) return { ok: false, reason: 'throws' };
   state.money += BOCCE_REWARD;
-  state.jobs.boccePaid.push(roundId);
+  state.jobs.boccePaid.push(roundId); state.lastOpId = roundId;
   return { ok: true, reward: BOCCE_REWARD, already: false, distances: bocceDistances(throws.map((t) => bocceLand(t.angle, t.power))) };
 }
 
