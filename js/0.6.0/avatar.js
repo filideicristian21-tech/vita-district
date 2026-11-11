@@ -122,6 +122,20 @@ function beardMask(d, shape) {
 export class Avatar {
   constructor() { this.root = new THREE.Group(); this.mixer = null; this.actions = {}; this.current = null; }
 
+  // v0.6 (Teco): frustum culling vero anche per i personaggi. Sfera fissa (posa a riposo ×1,7: copre corsa e nuoto) nello spazio di ogni mesh.
+  enableCulling() {
+    this.root.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(this.model); const c = box.getCenter(new THREE.Vector3());
+    const R = box.getSize(new THREE.Vector3()).length() * 0.5 * 1.7;
+    const inv = new THREE.Matrix4(), sc = new THREE.Vector3();
+    this.model.traverse((o) => {
+      if (!o.isMesh) return;
+      inv.copy(o.matrixWorld).invert(); o.matrixWorld.decompose(new THREE.Vector3(), new THREE.Quaternion(), sc);
+      o.boundingSphere = new THREE.Sphere(c.clone().applyMatrix4(inv), R / Math.max(1e-6, sc.x));
+      if (o.isSkinnedMesh) o.frustumCulled = true;
+    });
+  }
+
   async load(url, { height = 1.78, isPlayer = false, tint = null, smooth = true } = {}) {
     const smoothed = new Set();
     const gltf = await loadGLB(url);
@@ -170,6 +184,7 @@ export class Avatar {
     this.play(this.actions.Idle ? 'Idle' : Object.keys(this.actions)[0]);
     if (isPlayer) { this.setupGrooming(); this.setupFace(); }
     else this.setupFace({ npc: true });
+    this.enableCulling();
     return this;
   }
 
@@ -384,7 +399,7 @@ export class Avatar {
     fill(this.hairLayers, this.stubbleHair, (d, mm) => hairMask(d, mm), L.hairMm,
       { regional: true, thick: 0.6, base: 1.5, droop: 0.5, droopFrom: 45, minShell: 4, contactFull: 6, contactAlpha: 0.8 });
     fill(this.beardLayers, this.stubbleBeard, (d) => beardMask(d, L.shape), L.beardMm,
-      { thick: 0.7, base: 0.8, droop: 0.6, droopFrom: 15, minShell: 2.5, contactFull: 3, contactAlpha: 0.7 });
+      { thick: 0.8, base: 0.8, droop: 0.6, droopFrom: 15, minShell: 2.0, contactFull: 1.4, contactAlpha: 0.88 });
   }
 
   // ---------- Volto: occhi con iride, palpebre, sopracciglia ----------

@@ -209,7 +209,8 @@ export class World {
       g.visible = on; if (on) { vis++; const near = d < detail; for (const m of g.userData.details) m.visible = near; }
     }
     this.visibleCells = vis;
-    for (const g of this.propChunks || []) g.visible = g.userData.c.distanceTo(cp) < Math.min(far, g.userData.maxD + 56);
+    for (const g of this.propChunks || []) { const d = g.userData.c.distanceTo(cp); g.visible = d < Math.min(far, g.userData.maxD + 56);
+      if (g.visible && g.userData.lo) { const near = d < g.userData.lowD; g.userData.hi.visible = near; g.userData.lo.visible = !near; } }
   }
 
   buildGround() {
@@ -500,7 +501,20 @@ export class World {
     });
     shutters.count = si;
     if (!this.roofGB.empty) { const rm = this.makePbr('roof', { roughness: 0.82 }, 0.6); rm.vertexColors = true; const roofs = new THREE.Mesh(this.roofGB.geometry(), rm); roofs.castShadow = true; roofs.receiveShadow = true; this.group.add(roofs); this.roofsV3 = roofs; }
-    for (const im of [glass, frame, sill, shutters]) { im.receiveShadow = true; im.castShadow = false; this.group.add(im); }
+    // v0.6 (Teco): finestre divise in blocchi da 64 m (frustum + distanza), prima ~84k triangoli sempre disegnati
+    for (const im of [glass, frame, sill, shutters]) { im.receiveShadow = true; im.castShadow = false; this.splitInstanced(im, 64, 100); }
+  }
+  splitInstanced(im, size, maxD) {
+    const m4 = new THREE.Matrix4(), v = new THREE.Vector3(); const by = new Map();
+    for (let i = 0; i < im.count; i++) { im.getMatrixAt(i, m4); v.setFromMatrixPosition(m4); const k = Math.floor(v.x / size) + ',' + Math.floor(v.z / size); if (!by.has(k)) by.set(k, []); by.get(k).push(m4.clone()); }
+    this.propChunks ||= [];
+    for (const list of by.values()) {
+      const part = new THREE.InstancedMesh(im.geometry, im.material, list.length); let sx = 0, sz = 0;
+      list.forEach((m, i) => { part.setMatrixAt(i, m); v.setFromMatrixPosition(m); sx += v.x; sz += v.z; });
+      part.receiveShadow = im.receiveShadow; part.castShadow = im.castShadow; part.computeBoundingSphere();
+      const grp = new THREE.Group(); grp.userData.c = new THREE.Vector3(sx / list.length, 1, sz / list.length); grp.userData.maxD = maxD;
+      grp.add(part); this.scene.add(grp); this.propChunks.push(grp);
+    }
   }
 
   buildPiazza() {
@@ -538,6 +552,18 @@ export class World {
     (this.benchSpots ||= []).push({ x, z, ry });
   }
 
+  // lampione leggero (~90 triangoli) per i blocchi lontani: palo, braccio e lanterna
+  lowLamp() {
+    if (this._lowLamp) return this._lowLamp;
+    const parts = [];
+    const post = new THREE.CylinderGeometry(0.06, 0.1, 4.3, 6, 1, true); post.translate(0, 2.15, 0); parts.push(post);
+    const arm = new THREE.BoxGeometry(0.06, 0.06, 0.7); arm.translate(0, 4.25, 0.3); parts.push(arm);
+    const lan = new THREE.CylinderGeometry(0.16, 0.1, 0.36, 6); lan.translate(0, 4.05, 0.6); parts.push(lan);
+    const g = mergeGeometries(parts.map((x) => x.toNonIndexed()));
+    const wrap = new THREE.Group(); wrap.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: '#2b2e30', roughness: 0.55, metalness: 0.6 })));
+    return (this._lowLamp = wrap);
+  }
+
   async normGLB(url, target, axis = 'y') {
     const g = await loadGLB(url); const o = g.scene.clone(true);
     const b = new THREE.Box3().setFromObject(o); const s = b.getSize(new THREE.Vector3());
@@ -551,30 +577,34 @@ export class World {
     const r = rng(7);
     // lampioni lungo Via del Porto
     const lamp = await this.normGLB('./assets/props/street_lamp_01.glb', 4.6);
+    const lampPts = []; // v0.6 (Teco): lampioni istanziati a blocchi (culling) e senza ombra: erano ~100k triangoli allo spawn
     for (let x = -88; x <= 88; x += 16) for (const z of [-5.9, 5.9]) {
       if (Math.abs(x + 48) < 4 || Math.abs(x - 48) < 4) continue;
       if (z > 0 && Math.abs(x + 8) < 2) continue; // v0.2: il palo copriva la visuale allo spawn
       if (z < 0 && Math.abs(x - 24) < 2) continue; // davanti alla porta della Sartoria
-      const l = lamp.clone(true); l.position.set(x + (z > 0 ? 8 : 0), 0.12, z); l.rotation.y = z > 0 ? Math.PI : 0; this.group.add(l);
-      this.circles.push({ x: l.position.x, z, r: 0.25 });
+      lampPts.push([x + (z > 0 ? 8 : 0), 0.12, z, z > 0 ? Math.PI : 0]);
+      this.circles.push({ x: x + (z > 0 ? 8 : 0), z, r: 0.25 });
     }
-    for (let z = -150; z <= -90; z += 30) for (const x of [-52.1, 52.1]) { const l = lamp.clone(true); l.position.set(x, 0.12, z); l.rotation.y = x < 0 ? Math.PI / 2 : -Math.PI / 2; this.group.add(l); this.circles.push({ x, z, r: 0.25 }); }
-    for (let x = -36; x <= 36; x += 24) { const l = lamp.clone(true); l.position.set(x, 0.12, -173.2); this.group.add(l); this.circles.push({ x, z: -173.2, r: 0.25 }); }
+    for (let z = -150; z <= -90; z += 30) for (const x of [-52.1, 52.1]) { lampPts.push([x, 0.12, z, x < 0 ? Math.PI / 2 : -Math.PI / 2]); this.circles.push({ x, z, r: 0.25 }); }
+    for (let x = -36; x <= 36; x += 24) { lampPts.push([x, 0.12, -173.2, 0]); this.circles.push({ x, z: -173.2, r: 0.25 }); }
+    this.instanceAt(lamp, lampPts, { cast: false, maxD: 120, chunk: 32, low: this.lowLamp(), lowD: 30 });
     // alberi in piazza e lungo le traverse (tronco + chioma da cespuglio Poly Haven)
     const shrub = await this.normGLB('./assets/props/shrub_04.glb', 3.4);
     const shrub2 = await this.normGLB('./assets/props/shrub_02.glb', 1.1);
     const trunkG = new THREE.CylinderGeometry(0.12, 0.2, 3.2, 10);
+    const crownA = [], crownB = [];
     const tree = (x, z, s = 1) => {
       const t = new THREE.Mesh(trunkG, this.mats.bark); t.position.set(x, 0.12 + 1.6 * s, z); t.scale.setScalar(s); t.castShadow = true; this.group.add(t);
+      // v0.6 (Teco): 2 chiome per albero (erano 3), istanziate a blocchi di 40 m; solo quella principale fa ombra
       for (let k = 0; k < 3; k++) {
-        const c = shrub.clone(true); const a = r() * 6.28, rr = k ? 0.7 : 0;
-        c.position.set(x + Math.cos(a) * rr * s, 0.12 + (2.0 + (k ? 0.5 : 0)) * s, z + Math.sin(a) * rr * s);
-        c.scale.setScalar((k ? 0.95 : 1.25) * s); c.rotation.y = r() * 6.28; this.group.add(c);
+        const a = r() * 6.28, rr = k ? 0.7 : 0; const ry = r() * 6.28; if (k === 2) continue;
+        (k ? crownB : crownA).push([x + Math.cos(a) * rr * s, 0.12 + (2.0 + (k ? 0.55 : 0)) * s, z + Math.sin(a) * rr * s, ry, null, (k ? 1.1 : 1.3) * s]);
       }
       this.circles.push({ x, z, r: 0.35 }); this.mapShapes.push({ type: 'tree', x, z });
     };
     for (const [x, z] of [[-14, 30], [14, 30], [-18, 31], [18, 29]]) tree(x, z, 1.1);
     for (let z = -66; z <= 66; z += 14) { if (Math.abs(z) < 12) continue; tree(-43.6, z + 4, 0.9); tree(43.6, z - 3, 0.9); }
+    this.instanceAt(shrub, crownA, { cast: true, maxD: 120, chunk: 40 }); this.instanceAt(shrub, crownB, { cast: false, maxD: 90, chunk: 40 });
     for (const [x, z] of [[-15, 13], [15, 13], [-12, 13.5], [12, 12.5], [-17, 12.8], [17, 13.2]]) {
       const s = shrub2.clone(true); s.position.set(x, 0.27, z); s.rotation.y = r() * 6.28; this.group.add(s);
     }
@@ -840,7 +870,7 @@ export class World {
   // Lampioni (GLB Poly Haven, istanziati) e auto parcheggiate (GLB CC0, tinte per istanza) dei quartieri v0.4/v0.5.
   async buildTownProps() {
     const lamp = await this.normGLB('./assets/props/street_lamp_01.glb', 4.6);
-    this.instanceAt(lamp, this.lampPts5.map(([x, z, ry]) => [x, 0.12, z, ry]), { cast: false, maxD: 80 });
+    this.instanceAt(lamp, this.lampPts5.map(([x, z, ry]) => [x, 0.12, z, ry]), { cast: false, maxD: 110, chunk: 40, low: this.lowLamp(), lowD: 34 });
     const defs = [['sedan', 4.6], ['van', 4.9], ['corallo', 4.3]];
     const cars = []; for (const [n, len] of defs) cars.push(await this.normGLB(`./assets/props/${n}.glb`, len, 'len'));
     const by = [[], [], []]; const tints = ['#ffffff', '#e8e4dc', '#c9d2d8', '#d8c8b0', '#9fb0bf', '#b9c4b0', '#f0e0d0', '#c0b8b0'];
@@ -855,21 +885,28 @@ export class World {
     by.forEach((list, k) => this.instanceAt(cars[k], list, { cast: true, tint: true, maxD: 100 }));
   }
   // Istanze raggruppate a blocchi di 112 m: ogni blocco ha la sua bounding sphere (frustum culling vero) e sparisce oltre maxD.
-  instanceAt(wrap, list, { cast = true, tint = false, maxD = 90 } = {}) {
+  instanceAt(wrap, list, { cast = true, tint = false, maxD = 90, chunk = 112, low = null, lowD = 34 } = {}) {
     if (!list.length) return;
     wrap.updateMatrixWorld(true);
     const meshes = []; wrap.traverse((m) => { if (m.isMesh) meshes.push(m); });
     const T = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1), c = new THREE.Color();
     const chunks = new Map();
-    for (const it of list) { const k = Math.floor(it[0] / 112) + ',' + Math.floor(it[2] / 112); if (!chunks.has(k)) chunks.set(k, []); chunks.get(k).push(it); }
+    for (const it of list) { const k = Math.floor(it[0] / chunk) + ',' + Math.floor(it[2] / chunk); if (!chunks.has(k)) chunks.set(k, []); chunks.get(k).push(it); }
     this.propChunks ||= [];
     for (const items of chunks.values()) {
       let sx = 0, sz = 0; for (const it of items) { sx += it[0]; sz += it[2]; }
       const grp = new THREE.Group(); grp.userData.c = new THREE.Vector3(sx / items.length, 1, sz / items.length); grp.userData.maxD = maxD;
+      const hi = new THREE.Group(); grp.add(hi);
+      if (low) { // v0.6 (Teco): versione leggera per i blocchi lontani
+        low.updateMatrixWorld(true); const lo = new THREE.Group(); grp.add(lo); grp.userData.hi = hi; grp.userData.lo = lo; grp.userData.lowD = lowD;
+        low.traverse((m) => { if (!m.isMesh) return; const im = new THREE.InstancedMesh(m.geometry, m.material, items.length);
+          items.forEach(([x, y, z, ry, col, sc = 1], i) => { T.compose(v.set(x, y, z), q.setFromEuler(e.set(0, ry, 0)), one.setScalar(sc)); T.multiply(m.matrixWorld); im.setMatrixAt(i, T); });
+          im.castShadow = false; im.receiveShadow = true; im.computeBoundingSphere(); lo.add(im); });
+      }
       for (const m of meshes) {
         const im = new THREE.InstancedMesh(m.geometry, m.material, items.length);
-        items.forEach(([x, y, z, ry, col], i) => { T.compose(v.set(x, y, z), q.setFromEuler(e.set(0, ry, 0)), one); T.multiply(m.matrixWorld); im.setMatrixAt(i, T); if (tint && col) im.setColorAt(i, c.set(col)); });
-        im.castShadow = cast; im.receiveShadow = true; im.computeBoundingSphere(); grp.add(im);
+        items.forEach(([x, y, z, ry, col, sc = 1], i) => { T.compose(v.set(x, y, z), q.setFromEuler(e.set(0, ry, 0)), one.setScalar(sc)); T.multiply(m.matrixWorld); im.setMatrixAt(i, T); if (tint && col) im.setColorAt(i, c.set(col)); });
+        im.castShadow = cast; im.receiveShadow = true; im.computeBoundingSphere(); hi.add(im);
       }
       this.scene.add(grp); this.propChunks.push(grp);
     }

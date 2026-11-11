@@ -8,7 +8,7 @@ import { PLACES } from './places.js';
 import { MapUI } from './map.js';
 import { stepWalker, walkerPos } from './collide.js';
 import { newCar, stepCar, fwdSpeed, kmh, carCircles, exitSpot } from './car.js';
-import { buildCar, setWheels, setShiny } from './carmodel.js';
+import { buildCar, setWheels, setShiny, carLOD } from './carmodel.js';
 import { DIALOGS, dialogHTML } from './dialog.js';
 import * as A from './activities.js';
 import { LAYOUT } from './layout.js';
@@ -48,6 +48,16 @@ renderer.setPixelRatio(pixelRatio);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// v0.6 (Teco): 3 livelli di qualità. «auto» = media sul telefono, alta sul computer; scende a bassa da sola se resta lento.
+// Salvato a parte (localStorage 'vd.quality'), non tocca il salvataggio di gioco.
+const QUALITY = {
+  alta: { shadow: true, map: 2048, far: 240, detail: 95, pr: 1.75 },
+  media: { shadow: true, map: 1024, far: 150, detail: 75, pr: 1.5 },
+  bassa: { shadow: false, map: 512, far: 115, detail: 55, pr: 1.0 },
+};
+let qualityPref = 'auto'; try { qualityPref = localStorage.getItem('vd.quality') || 'auto'; } catch (e) { /* niente storage */ }
+if (!QUALITY[qualityPref] && qualityPref !== 'auto') qualityPref = 'auto';
+let qualityTier = qualityPref === 'auto' ? (phoneLike ? 'media' : 'alta') : qualityPref;
 const scene = new THREE.Scene();
 // nebbia leggera color cielo; oltre la nebbia non si disegna niente (camera.far e culling delle celle allineati)
 const FOG_FAR = phoneLike ? 175 : 230;
@@ -60,6 +70,13 @@ sun.castShadow = true; sun.shadow.mapSize.set(phoneLike ? 1024 : 2048, phoneLike
 const SH = phoneLike ? 22 : 28; const SC = sun.shadow.camera; SC.left = -SH; SC.right = SH; SC.top = SH; SC.bottom = -SH; SC.near = 1; SC.far = 140;
 sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
 scene.add(sun); scene.add(sun.target);
+function applyQuality(tier) {
+  qualityTier = tier; const Q = QUALITY[tier];
+  sun.castShadow = Q.shadow;
+  if (sun.shadow.mapSize.x !== Q.map) { sun.shadow.mapSize.set(Q.map, Q.map); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; } }
+  const prMax = Math.min(PR_MAX, Q.pr); if (pixelRatio > prMax) { pixelRatio = Math.max(PR_MIN, prMax); renderer.setPixelRatio(pixelRatio); if (typeof resize === 'function') resize(); }
+}
+applyQuality(qualityTier);
 const SUN_DIR = new THREE.Vector3(-0.55, 0.72, 0.42).normalize();
 
 function resize() {
@@ -592,7 +609,7 @@ function openMenu() {
    <div class="row"><button class="pill primary" id="mResume">▶ Riprendi</button><button class="pill" id="mSave">💾 Salva ora</button><button class="pill" id="mMirror">🪞 Specchio e crescita</button>
    ${state.inventory.coffee > 0 ? '<button class="pill" id="mDrink">☕ Bevi caffè</button>' : ''}</div>
    <h3>Comandi</h3><small>${matchMedia('(pointer:coarse)').matches ? 'Pollice sinistro: cammina (fino al bordo = corsa). Pollice destro: gira la visuale. Tasto in basso a destra: interagisci. In auto: ◀ ▶ a sinistra, Frena/Accelera a destra, D/R da fermi, Scendi in alto a sinistra.' : 'WASD/frecce, Shift corsa, trascina col mouse, rotella zoom, E interagisci, M mappa, Esc menu. In auto: W gas, S freno (tenuto da fermi = retromarcia), A/D sterzo, C ricentra, E scendi.'}</small>
-   <div class="row"><button class="pill" id="mTut">Rivedi guida</button><button class="pill" id="mStuck">🧭 Sono bloccato</button>${document.fullscreenEnabled ? '<button class="pill" id="mFull">⛶ Schermo intero</button>' : ''}<button class="pill danger" id="mReset">Elimina progressi…</button></div>
+   <div class="row"><button class="pill" id="mTut">Rivedi guida</button><button class="pill" id="mStuck">🧭 Sono bloccato</button>${document.fullscreenEnabled ? '<button class="pill" id="mFull">⛶ Schermo intero</button>' : ''}<button class="pill" id="mQual">🎚 Qualità: ${qualityPref === 'auto' ? `auto (${qualityTier})` : qualityTier}</button><button class="pill danger" id="mReset">Elimina progressi…</button></div>
    <h3>Crediti e licenze</h3><small>three.js (MIT). Personaggi: Quaternius (CC0). Texture e cielo: ambientCG, Poly Haven (CC0). Lampioni e cespugli: Poly Haven (CC0). Auto: Quaternius, RGS_Dev (CC0). Tegole, sabbia, mattoni, intonaco: Poly Haven (CC0). Volti, abiti, vetrine, alberi, insegne, mare e campanile: procedurali. Dettagli in README.md / LICENSES.md.</small><br>
    <small>Prototipo v0.6.0 · mare nuotabile, grafica web più curata, pensata per il telefono. Auto e marchi inventati. iPhone reale non verificato.</small>`);
   $('mResume').onclick = () => closeAll();
@@ -601,6 +618,10 @@ function openMenu() {
   if ($('mDrink')) $('mDrink').onclick = () => { S.consume(state, 'coffee'); drink(); saveNow(); closeAll(); };
   $('mTut').onclick = () => { closeAll(); state.tutorialDone = false; startTutorial(); };
   $('mStuck').onclick = () => { closeAll(); rescueFoot(); };
+  $('mQual').onclick = () => { const order = ['auto', 'alta', 'media', 'bassa']; qualityPref = order[(order.indexOf(qualityPref) + 1) % order.length];
+    try { localStorage.setItem('vd.quality', qualityPref); } catch (e) { /* niente storage */ }
+    applyQuality(qualityPref === 'auto' ? (phoneLike ? 'media' : 'alta') : qualityPref);
+    $('mQual').textContent = `🎚 Qualità: ${qualityPref === 'auto' ? `auto (${qualityTier})` : qualityTier}`; };
   if ($('mFull')) $('mFull').onclick = () => { (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => toast('Schermo intero non disponibile qui.')); };
   $('mReset').onclick = () => confirmBox('Vuoi eliminare i progressi di VITA DISTRICT salvati in questo browser (posizione, crediti, inventario, look, consegne)? L\'operazione non è annullabile. Gli altri siti e giochi non vengono toccati.', 'Elimina progressi', () => {
     if (S.resetSave(store) < 0) { toast('Non sono riuscito a eliminare i progressi (memoria del browser non accessibile).', 5000); return; }
@@ -997,9 +1018,12 @@ function loop() {
   fpsAcc += raw; fpsN++;
   if (fpsAcc > 2) { const fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; window.__fps = fps;
     if (fps < 28 && pixelRatio > PR_MIN) { lowFps++; if (lowFps >= 2) { pixelRatio = Math.max(PR_MIN, pixelRatio - 0.25); renderer.setPixelRatio(pixelRatio); resize(); lowFps = 0; } }
-    else if (fps > 52 && pixelRatio < PR_MAX && !loop.cappedUp) { lowFps--; if (lowFps <= -3) { pixelRatio = Math.min(PR_MAX, pixelRatio + 0.25); renderer.setPixelRatio(pixelRatio); resize(); lowFps = 0; } }
+    else if (fps > 52 && pixelRatio < Math.min(PR_MAX, QUALITY[qualityTier].pr) && !loop.cappedUp) { lowFps--; if (lowFps <= -3) { pixelRatio = Math.min(PR_MAX, QUALITY[qualityTier].pr, pixelRatio + 0.25); renderer.setPixelRatio(pixelRatio); resize(); lowFps = 0; } }
     else lowFps = 0;
     if (fps < 28 && lowFps === 0 && pixelRatio === PR_MIN) loop.cappedUp = true; // dopo un calo non risale più (niente altalena)
+    // v0.6: in «auto», se anche a risoluzione minima resta sotto 24 fps per ~6 s, scende di un livello (senza ombre in «bassa»)
+    if (qualityPref === 'auto' && fps < 24 && pixelRatio === PR_MIN && qualityTier !== 'bassa') { loop.slowN = (loop.slowN || 0) + 1; if (loop.slowN >= 3) { applyQuality(qualityTier === 'alta' ? 'media' : 'bassa'); loop.slowN = 0; } }
+    else loop.slowN = 0;
   }
 
   const p = player.root.position;
@@ -1097,7 +1121,9 @@ function loop() {
   if (saveTimer > 4) { saveTimer = 0; if (dirty) { state.player = playerPose(); saveNow(); } }
   if (hudTimer > 0.25) { hudTimer = 0; if (!uiOpen) refreshHUD(); updateInteract(); document.body.classList.toggle('ui', !!uiOpen || !!sitting); document.body.classList.toggle('driving', driving); }
   if (miniTimer > 0.15) { miniTimer = 0; mapUI.drawMini($('mini')); if (uiOpen === 'map') mapUI.draw(); }
-  world.cull(camera, phoneLike ? 150 : FOG_FAR + 10, phoneLike ? 75 : 95);
+  { const Q = QUALITY[qualityTier]; world.cull(camera, Math.min(Q.far, FOG_FAR + 10), Q.detail); }
+  { const cp = camera.position; for (const m of Object.values(carMeshes)) if (m && m.visible) carLOD(m, m.position.distanceTo(cp));
+    for (const m of world.displayCars || []) carLOD(m, m.position.distanceTo(cp)); }
   gateBeaconUpdate(t);
   renderer.render(scene, camera);
 }
@@ -1471,7 +1497,7 @@ if (TEST_HOOK) window.__vd = {
   step(sec) { for (let t = 0; t < sec; t += 1 / 30) updatePlayer(1 / 30); },
   // v0.3
   enterCar, tryExit, unstuck, openDealer, openTalk, recenter, npcs, get driving() { return driving; },
-  swim, depthAt, cycleSwimStyle, toggleDive, SEA, get swimming() { return swimming(); }, get underwater() { return fxUnder; }, CAR_LIMIT,
+  swim, depthAt, cycleSwimStyle, toggleDive, SEA, get swimming() { return swimming(); }, get underwater() { return fxUnder; }, CAR_LIMIT, get quality() { return qualityTier; }, setQuality(t) { qualityPref = t; applyQuality(t === 'auto' ? (phoneLike ? 'media' : 'alta') : t); },
   get car() { const c = car || parked; return c && { id: state.garage.selected, x: c.x, z: c.z, yaw: c.yaw, v: fwdSpeed(c), kmh: kmh(c), gearR: drv.gearR, stuckT: c.stuckT, steer: c.steer, driving }; },
   setDrive(o) { Object.assign(drv, o); }, keys: input.keys,
   drive(sec, inp) { for (let t = 0; t < sec; t += 1 / 30) { stepCar(car, inp, 1 / 30, carWorld()); } const p = player.root.position; p.x = car.x; p.z = car.z; },

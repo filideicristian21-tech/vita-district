@@ -128,7 +128,7 @@ export function buildCar(id, spec, color = spec.color) {
   const rims = new THREE.InstancedMesh(mergeGeometries(rimParts.map(strip)), m.rim, 4); rims.castShadow = false;
   for (const w of [wheels, rims]) { w.boundingSphere = new THREE.Sphere(new THREE.Vector3(), Math.max(L, W)); w.frustumCulled = true; root.add(w); }
   const half = spec.wb / 2, wx = W / 2 - tw / 2 - 0.04;
-  root.userData = { wheels, rims, wheelPos: [[wx, r, half], [-wx, r, half], [wx, r, -half], [-wx, r, -half]], body, paintMesh: paint };
+  root.userData = { lights, trim, glass, wheels, rims, wheelPos: [[wx, r, half], [-wx, r, half], [wx, r, -half], [-wx, r, -half]], body, paintMesh: paint };
   setWheels(root, 0, 0);
   return root;
 }
@@ -143,4 +143,12 @@ export function setWheels(root, rot, steer, roll = 0) {
   });
   u.wheels.instanceMatrix.needsUpdate = true; if (u.rims) u.rims.instanceMatrix.needsUpdate = true;
   u.body.rotation.z = roll; // leggero rollio in curva (solo estetico)
+}
+
+// v0.6 (Teco): LOD a 20/50 m. Vicino tutto; 20-50 m niente ombre dei dettagli; oltre 50 m solo scocca, vetri e gomme (niente cerchi, plastiche, luci).
+export function carLOD(root, d) {
+  const u = root.userData; const lvl = d < 20 ? 0 : d < 50 ? 1 : 2;
+  if (u.lod === lvl) return; u.lod = lvl;
+  u.trim.visible = u.lights.visible = u.rims.visible = lvl < 2;
+  u.trim.castShadow = u.wheels.castShadow = lvl === 0;
 }
