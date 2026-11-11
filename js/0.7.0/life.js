@@ -28,7 +28,7 @@ export const RESALE = 0.7; // rivendita al 70%: comprare e rivendere non crea cr
 // Lavori: stipendio per giornata di gioco, un turno pagato al giorno (in tutto, quindi anche per lavoro).
 export const JOBS = {
   barista:   { name: 'Barista', place: 'Caffè Sottovento', boss: 'Marta', wage: 7500, from: 6, to: 20, icon: '☕' },
-  bagnino:   { name: 'Bagnino', place: 'Lido Conchiglia', boss: 'Fede', wage: 8000, from: 8, to: 19, icon: '🛟' },
+  bagnino:   { name: 'Bagnino', place: 'Lido Conchiglia', boss: 'Pina', wage: 8000, from: 8, to: 19, icon: '🛟' },
   barbiere:  { name: 'Barbiere', place: 'Barberia Lama d\'Oro', boss: 'Tonino', wage: 9500, from: 8, to: 20, icon: '💈' },
   meccanico: { name: 'Meccanico', place: 'Officina di Gino', boss: 'Gino', wage: 11000, from: 7, to: 19, icon: '🔧', needShifts: 3 },
 };
@@ -168,5 +168,5 @@ function payShift(state, s, day) {
 }
 
 // Agenzia immobiliare (nome inventato) e lotto della villa (dentro la Pineta, alberi tolti lì)
-export const AGENCY = { name: 'Immobiliare Faro & Mare', x: -28, z: -7.2, face: 0 };
+export const AGENCY = { name: 'Immobiliare Faro & Mare', x: -20, z: -7.2, face: 0 };
 export const VILLA_LOT = { x0: -246, x1: -214, z0: 90, z1: 118 };

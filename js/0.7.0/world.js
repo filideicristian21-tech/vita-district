@@ -936,10 +936,11 @@ export class World {
     { const uv = roof.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 6, uv.getY(i) * 2); } parts.roof.push(roof);
     box('stone', 16.6, 0.5, 10.6, -234, base + 0.25, 107, 2); box('stone', 7.6, 0.5, 8.6, -222.5, base + 0.25, 108, 2); // zoccolo in pietra
     // loggia ad archi sul fronte sud: colonne, architrave, pavimento e terrazzo in marmo
-    for (const x of [-240.5, -237.5, -234.5, -231.5, -228.5]) { const c = new THREE.CylinderGeometry(0.22, 0.26, 3.1, 10); c.translate(x, base + 0.3 + 1.55, 99.4); parts.stone.push(c); this.circles.push({ x, z: 99.4, r: 0.3 }); }
-    box('stone', 13, 0.45, 0.6, -234.5, base + 3.6, 99.4, 2);
-    for (let k = 0; k < 4; k++) { const a = new THREE.TorusGeometry(1.3, 0.14, 6, 12, Math.PI); a.translate(-239 + k * 3, base + 2.05, 99.4); parts.stone.push(a); } // archi
-    box('marble', 13.4, 0.3, 3.2, -234.5, base + 0.15, 100.4, 2); box('marble', 13.4, 0.2, 3.4, -234.5, base + 3.92, 100.4, 2);
+    const cols = [-241, -238, -235.6, -232.4, -230, -227]; // varco centrale più largo davanti al portone
+    for (const x of cols) { const c = new THREE.CylinderGeometry(0.22, 0.26, 3.1, 10); c.translate(x, base + 0.3 + 1.55, 99.4); parts.stone.push(c); this.circles.push({ x, z: 99.4, r: 0.3 }); }
+    box('stone', 14.6, 0.45, 0.6, -234, base + 3.6, 99.4, 2);
+    for (let k = 0; k < cols.length - 1; k++) { const r = (cols[k + 1] - cols[k]) / 2 - 0.2; const a = new THREE.TorusGeometry(r, 0.13, 6, 12, Math.PI); a.translate((cols[k] + cols[k + 1]) / 2, base + 3.38 - r, 99.4); parts.stone.push(a); } // archi
+    box('marble', 15, 0.3, 3.2, -234, base + 0.15, 100.4, 2); box('marble', 15, 0.2, 3.4, -234, base + 3.92, 100.4, 2);
     box('marble', 2.2, 0.06, 9.4, -234, base + 0.03, 94, 2); // vialetto dal cancello
     // piscina con bordo in marmo
     box('marble', 9.6, 0.4, 7.6, -219.5, base + 0.2, 96); this.addBox(-224.3, -214.7, 92.2, 99.8, 0, 0.9);
@@ -987,11 +988,11 @@ export class World {
     const geo = mergeGeometries([board.toNonIndexed(), pole.toNonIndexed()]);
     this.houseSigns = {};
     for (const [id, h] of Object.entries(HOUSES)) {
-      const side = id === 'villa' ? { x: 1.8, z: -9.2 } : { x: Math.cos(h.face) * 1.1, z: -Math.sin(h.face) * 1.1 };
+      const side = id === 'villa' ? { x: -3.4, z: -10 } : { x: Math.cos(h.face) * 1.6 - Math.sin(h.face) * 0.62, z: -Math.sin(h.face) * 1.6 - Math.cos(h.face) * 0.62 }; // contro la facciata, accanto alla porta
       const m = new THREE.Mesh(geo, this.signMats.sale); m.position.set(h.door.x + side.x, this.groundHeight(h.door.x, h.door.z), h.door.z + side.z); m.rotation.y = h.face; m.castShadow = true;
       this.scene.add(m); this.houseSigns[id] = m; this.circles.push({ x: m.position.x, z: m.position.z, r: 0.12 });
     }
-    this.sign('IMMOBILIARE FARO & MARE', 'case · appartamenti · ville · solo crediti di gioco', AGENCY.x, 3.4, AGENCY.z - 0.75, AGENCY.face, 5.2);
+    this.sign('FARO & MARE', 'immobiliare · case e ville · crediti di gioco', AGENCY.x, 3.4, AGENCY.z - 0.75, AGENCY.face, 5.2);
   }
   setHouseSigns(owned) { for (const [id, m] of Object.entries(this.houseSigns || {})) m.material = owned.includes(id) ? this.signMats.own : this.signMats.sale; }
 

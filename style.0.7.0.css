@@ -156,3 +156,25 @@ body:not(.driving) #cRetry{bottom:calc(var(--sa-b) + 96px)}
 body.swimming #btnAct{display:none}
 #underwater{position:fixed;inset:0;pointer-events:none;z-index:2;background:radial-gradient(ellipse at 50% 40%,#2a8a8a22 0%,#0d4a5266 70%,#082f3899 100%);opacity:0;transition:opacity .25s}
 body.under #underwater{opacity:1}
+
+/* ---------- v0.7 ---------- */
+#clock.night{background:#0f1830d0;color:#cfdcff}
+#dBlinks{position:fixed;z-index:12;left:50%;transform:translateX(-50%);bottom:calc(var(--sa-b) + 58px);display:flex;gap:8px;pointer-events:none}
+#dBlinks .blk{min-width:52px;min-height:44px;font-size:20px;border-radius:12px}
+#dBlinks .blk.on{background:#ff9a1a;color:#151b20;border-color:#ffd08a}
+#dBlinks .haz{color:#ff6a5a}
+#dBlinks .haz.on{background:#ff4d3d;color:#fff}
+#speedo .ind{font-style:normal;margin:0 8px;color:#ffffff30;transition:none}
+body.blinkOn #speedo .ind.act{color:#ffa21a;text-shadow:0 0 8px #ff9a1a}
+.house{background:#ffffff0d;border:1px solid #ffffff1f;border-radius:12px;padding:8px 10px;margin:8px 0}
+.house.own{border-color:#9fd3c7aa;background:#9fd3c712}
+.house .hh{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.house .hh span{font-size:13px;color:var(--tx2)}
+.house .hp{display:flex;justify-content:space-between;gap:10px;margin:4px 0;font-size:14px}
+.house .price{font-weight:700;color:#e6bb70}
+.house .ok{color:#9fd3c7}.house .no{color:#ff8a7a}
+.pill.job{background:#2d4a3e;border-color:#9fd3c766;margin:0 0 8px 8px}
+.jbar{position:relative;height:34px;border-radius:10px;background:#ffffff14;margin:14px 4px;overflow:hidden}
+.jbar .zone{position:absolute;left:39%;width:22%;top:0;bottom:0;background:#4caf7a66;border-left:2px solid #7fd0a0;border-right:2px solid #7fd0a0}
+.jbar .mk{position:absolute;top:2px;bottom:2px;width:6px;margin-left:-3px;border-radius:3px;background:#fff;box-shadow:0 0 8px #fff8}
+.pill.big{min-height:52px;font-size:18px;padding:0 28px}

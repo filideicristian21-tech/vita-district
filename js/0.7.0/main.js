@@ -8,7 +8,9 @@ import { PLACES } from './places.js';
 import { MapUI } from './map.js';
 import { stepWalker, walkerPos } from './collide.js';
 import { newCar, stepCar, fwdSpeed, kmh, carCircles, exitSpot } from './car.js';
-import { buildCar, setWheels, setShiny, carLOD } from './carmodel.js';
+import { buildCar, setWheels, setShiny, carLOD, setBlink } from './carmodel.js';
+import * as Life from './life.js';
+import { NIGHT, lightPools, nightSky } from './nightfx.js';
 import { DIALOGS, dialogHTML } from './dialog.js';
 import * as A from './activities.js';
 import { LAYOUT } from './layout.js';
@@ -21,7 +23,7 @@ const memStore = { _m: new Map(), getItem(k) { return this._m.get(k) ?? null; },
 const store = storage || memStore;
 
 // ---------- Stato ----------
-let { state, status, credited, readOnly } = S.loadState(store, Date.now());
+let { state, status, credited, readOnly, topup } = S.loadState(store, Date.now());
 let dirty = false;
 const markDirty = () => { dirty = true; };
 if (S.migrationGuide(state, status)) markDirty();
@@ -77,7 +79,7 @@ function applyQuality(tier) {
   const prMax = Math.min(PR_MAX, Q.pr); if (pixelRatio > prMax) { pixelRatio = Math.max(PR_MIN, prMax); renderer.setPixelRatio(pixelRatio); if (typeof resize === 'function') resize(); }
 }
 applyQuality(qualityTier);
-const SUN_DIR = new THREE.Vector3(-0.55, 0.72, 0.42).normalize();
+const SUN_DIR = new THREE.Vector3(-0.55, 0.72, 0.42).normalize(); // v0.7: aggiornata dal ciclo giorno/notte (sole di giorno, luna di notte)
 
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
@@ -163,6 +165,11 @@ async function boot() {
   }
   buildCars();
   buildShells();
+  setupNight();
+  // v0.7: nuova partita = si parte davanti alla tua soffitta; dopo una dormita, davanti alla casa dove hai dormito
+  if (status === 'new' || state.life.homes.wakeAtHome) { const h = Life.homeSpot(state); player.root.position.set(h.x, world.groundHeight(h.x, h.z), h.z); player.root.rotation.y = h.yaw; cam.yaw = cam.sYaw = h.yaw + Math.PI;
+    if (state.life.homes.wakeAtHome) { state.life.homes.wakeAtHome = false; markDirty(); } state.player = playerPose(); }
+  world.setHouseSigns(state.life.homes.owned);
   safeStart();
   mapUI = new MapUI(world, state, { onWaypoint: setWaypoint, getPlayer: () => player.root.position, getYaw: () => player.root.rotation.y });
   $('loading').classList.add('hidden');
@@ -176,6 +183,9 @@ async function boot() {
   if (!state.tutorialDone) startTutorial();
   else if (!state.jobs.seen5 && status !== 'migrated') setTimeout(() => toast('Novità v0.5: a ovest la Contrada Salina con la spiaggia, a nord il Colle dei Limoni col campanile.', 6500), 1200);
   if (!state.jobs.seen5) { state.jobs.seen5 = true; markDirty(); }
+  if (topup > 0) setTimeout(() => toast(`Novità v0.7: il tuo saldo è stato portato a 100.000 crediti di gioco (+${cr(topup)}). Una volta sola, i progressi restano.`, 7000), 2200);
+  if (!state.jobs.seen7) { state.jobs.seen7 = true; markDirty(); setTimeout(() => toast('Novità v0.7: giorno e notte (10 min), case in vendita all\'Immobiliare Faro & Mare in piazza, lavori da Tonino, Marta, Pina e Gino. In auto: frecce e quattro frecce.', 8000), status === 'new' ? 1500 : 11000); }
+  if (!state.jobs.seen6 && status === 'new') { state.jobs.seen6 = true; markDirty(); }
   if (!state.jobs.seen6) { state.jobs.seen6 = true; markDirty(); setTimeout(() => toast('Novità v0.6: alla Spiaggia di Ponente si entra in mare e si nuota (libero, rana, dorso, sott\'acqua).', 6500), status === 'migrated' ? 9000 : 8000); }
   refreshHUD();
   requestAnimationFrame(loop);
@@ -317,7 +327,7 @@ window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return;
   const k = e.key.toLowerCase();
   if (k === 'escape') { if (uiOpen === 'game') endGame(); else if (uiOpen) closeAll(); else openMenu(); return; }
-  if (driving && !uiOpen) { input.keys.add(k); if (k === 'e' || k === 'f') tryExit(); if (k === 'm') openMap(); if (k === 'c') recenter(); if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault(); return; }
+  if (driving && !uiOpen) { input.keys.add(k); if (k === 'q') setBlinker('L'); if (k === 'r') setBlinker('R'); if (k === 'x') setBlinker('H'); if (k === 'e' || k === 'f') tryExit(); if (k === 'm') openMap(); if (k === 'c') recenter(); if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault(); return; }
   if (uiOpen === 'game' && (k === ' ' || k === 'enter' || k === 'e')) { e.preventDefault(); gameAction(); return; }
   if (uiOpen) return;
   input.keys.add(k);
@@ -344,7 +354,7 @@ function interactables() {
     { id: 'shop', x: 24, z: -7.2, r: 2.4, label: 'Entra in Sartoria', run: openShop },
     { id: 'fish', x: world.fishSpot.x, z: world.fishSpot.z, r: 2.2, label: '🎣 Pesca', run: startFishing },
     { id: 'basket', x: world.shotSpot.x, z: world.shotSpot.z, r: 2.6, label: '🏀 Tiri liberi', run: startBasket },
-    { id: 'gino', x: LAYOUT.spots.gino.x, z: LAYOUT.spots.gino.z, r: 2.6, label: 'Parla con Gino', run: () => openTalk('gino') },
+    { id: 'gino', x: LAYOUT.spots.gino.x, z: LAYOUT.spots.gino.z, r: 2.6, label: '🔧 Gino · Officina (lavoro)', run: () => openJob('meccanico') },
     { id: 'paint', x: LAYOUT.spots.bay.x + 4, z: LAYOUT.spots.bay.z, r: 2.4, label: '🎨 Vernice', run: openPaint },
     { id: 'workshop', x: LAYOUT.spots.bay.x, z: LAYOUT.spots.bay.z, r: 3.4, label: '🔧 Controllo bulloni', run: startWorkshop },
     { id: 'lia', x: LAYOUT.spots.lia.x, z: LAYOUT.spots.lia.z, r: 2.6, label: 'Parla con Lia', run: openCourier },
@@ -354,13 +364,17 @@ function interactables() {
     { id: 'ottavio', x: LAYOUT.spots.ottavio.x, z: LAYOUT.spots.ottavio.z, r: 2.6, label: 'Parla con Ottavio', run: () => openTalk('ottavio') },
     { id: 'bocce', x: LAYOUT.spots.bocce.x, z: LAYOUT.spots.bocce.z, r: 3.2, label: '🟢 Bocce', run: startBocce },
     // v0.5
-    { id: 'pina', x: LAYOUT5.spots.pina.x, z: LAYOUT5.spots.pina.z + 0.4, r: 2.6, label: 'Parla con Pina', run: () => openTalk('pina') },
+    { id: 'pina', x: LAYOUT5.spots.pina.x, z: LAYOUT5.spots.pina.z + 0.4, r: 2.6, label: '🛟 Pina · Lido (lavoro da bagnino)', run: () => openJob('bagnino') },
     { id: 'assunta', x: world.gelato.x, z: world.gelato.z, r: 2.4, label: '🍦 Gelato da Assunta', run: () => openGelato() },
     { id: 'dario', x: LAYOUT5.spots.dario.x, z: LAYOUT5.spots.dario.z, r: 2.8, label: '🧽 Parla con Dario', run: () => openWash() },
   ];
   if (shellMeshes.length) for (const m of shellMeshes) if (m.visible) list.push({ id: 'shell', x: m.position.x, z: m.position.z, r: 1.6, label: '🐚 Raccogli la conchiglia', run: () => pickShell(m.userData.id) });
   if (parked) list.push({ id: 'car', x: parked.x, z: parked.z, r: parked.spec.len / 2 + 1.4, bias: 1.6, label: `🚗 Sali · ${parked.spec.name}`, run: enterCar });
   list.push({ id: 'dealer', x: -36.4, z: -89.2, r: 2.8, label: 'Parla con Saverio · Autosalone', run: () => openDealer() });
+  // v0.7: agenzia immobiliare e porte delle case
+  list.push({ id: 'agency', x: Life.AGENCY.x, z: Life.AGENCY.z, r: 2.6, label: '🏠 Immobiliare Faro & Mare', run: () => openAgency() });
+  for (const [hid, h] of Object.entries(Life.HOUSES)) { const own = state.life.homes.owned.includes(hid);
+    list.push({ id: 'house_' + hid, x: h.door.x, z: h.door.z, r: 2.4, label: own ? `🏠 Casa tua · ${h.name}` : `🏷 In vendita · ${h.name}`, run: () => openHouse(hid) }); }
   if (!(state.delivery && state.delivery.target === 'bice')) list.push({ id: 'bice', x: 71.4, z: -6.2, r: 2.2, label: 'Parla con la Signora Bice', run: () => openTalk('bice') });
   for (const b of world.benchSpots) if (!(b.x === -7 && b.z === 26)) list.push({ id: 'bench', x: b.x + Math.sin(b.ry) * 0.6, z: b.z + Math.cos(b.ry) * 0.6, r: 1.5, label: '🪑 Siediti', run: () => sitOn(b) });
   if (state.jobs && state.jobs.courier && !driving) list.push({ id: 'drop', x: A.COURIER.drop.x, z: A.COURIER.drop.z, r: A.COURIER.drop.r, label: 'Consegna il pacco al Belvedere', run: deliverCourier });
@@ -422,8 +436,10 @@ function confirmBox(text, yesLabel, onYes) {
 }
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+const cr = (n) => Math.round(n).toLocaleString('it-IT');
 function refreshHUD() {
-  $('money').textContent = `${state.money} crediti`;
+  $('money').textContent = `${cr(state.money)} crediti`;
+  { const n = Life.isNight(state.life); const el = $('clock'); if (el) { el.textContent = `${n ? '🌙' : '☀️'} ${Life.clockLabel(state.life)}`; el.classList.toggle('night', n); } }
   const L = S.visibleLengths(state);
   $('look').textContent = `✂ ${L.hairMm.toFixed(0)} mm · barba ${L.beardMm.toFixed(1)} mm`;
   const db = $('demoBadge'); if (state.grooming.demoDays > 0) { db.textContent = `DEMO: +${state.grooming.demoDays} gg simulati`; db.classList.remove('hidden'); } else db.classList.add('hidden');
@@ -493,6 +509,7 @@ function renderBarber(line) {
   $('panelBody').querySelectorAll('[data-h]').forEach((b) => b.onclick = () => { barberSel.hair = b.dataset.h; renderBarber(line); });
   $('panelBody').querySelectorAll('[data-b]').forEach((b) => b.onclick = () => { barberSel.beard = b.dataset.b; renderBarber(line); });
   $('bCancel').onclick = () => closeAll();
+  addJobButton('barbiere');
   $('bOk').onclick = (e) => {
     e.target.disabled = true;
     const opId = Math.max(Date.now(), state.lastOpId + 1);
@@ -549,6 +566,7 @@ function openCafe() {
   $('cDrink').onclick = () => { const r = S.buy(state, 'coffee'); if (!r.ok) return toast(r.reason); S.consume(state, 'coffee'); drink(); saveNow(); openCafe(); };
   $('cTake').onclick = () => { const r = S.buy(state, 'coffee'); if (!r.ok) return toast(r.reason); saveNow(); toast('Caffè nel tuo inventario.'); openCafe(); };
   $('cClose').onclick = closeAll;
+  addJobButton('barista');
 }
 function drink(msg = '☕ Che botta! Passo svelto per 2 minuti.') { boostUntil = performance.now() + 120000; toast(msg); refreshHUD(); }
 
@@ -581,7 +599,7 @@ function talkUgo() { openTalk('ugo'); }
 // ---------- Dialoghi a scelte (modulo dialog.js) ----------
 let talk = null; // { id, asked, from }
 function openTalk(id, fromPanel = false) {
-  const prev = fromPanel && { tonino: openBarber, marta: openCafe, rocco: openDepot, saverio: () => openDealer() }[id];
+  const prev = fromPanel && { tonino: openBarber, marta: openCafe, rocco: openDepot, saverio: () => openDealer(), pina: () => openJob('bagnino'), gino: () => openJob('meccanico') }[id];
   talk = { id, asked: [], back: prev || null };
   const h = new Date().getHours();
   talk.hello = id === 'ugo' ? (h < 13 ? 'Il porto si sveglia prima di tutti. Poi tocca a me, poi al caffè.' : 'Questo rione sembra piccolo, ma ogni vicolo ha una storia. Basta avere tempo di ascoltarla.') : null;
@@ -602,7 +620,7 @@ let paused = false;
 function openMenu() {
   paused = true;
   openPanel(`<h2>⏸ Pausa</h2>
-   <div class="stat"><span>Crediti</span><span>${state.money}</span><span>Inventario</span><span>☕ ${state.inventory.coffee} · 🍦 ${state.inventory.gelato || 0} · 🍬 ${state.inventory.candy} · 🐟 ${state.inventory.fish || 0}${state.delivery ? ' · 📦 1 pacco' : ''}</span>
+   <div class="stat"><span>Crediti</span><span>${cr(state.money)} (di gioco, senza valore reale)</span><span>Ora</span><span>${Life.clockLabel(state.life)} · un giorno dura 10 minuti</span><span>Casa</span><span>${esc(Life.HOUSES[state.life.homes.main].name)} · ne hai ${state.life.homes.owned.length}</span><span>Lavoro</span><span>${state.life.work.job ? esc(Life.JOBS[state.life.work.job].name) + ` · ${Life.totalShifts(state.life)} turni` : 'nessuno (Tonino, Marta, Pina e Gino cercano gente)'}</span><span>Inventario</span><span>☕ ${state.inventory.coffee} · 🍦 ${state.inventory.gelato || 0} · 🍬 ${state.inventory.candy} · 🐟 ${state.inventory.fish || 0}${state.delivery ? ' · 📦 1 pacco' : ''}</span>
    <span>Statistiche</span><span>${state.stats.deliveries} consegne · ${state.stats.haircuts} tagli · ${state.stats.coffees} caffè</span>
    <span>Record</span><span>🎣 ${state.records.fishCaught} pesci${state.records.bestFishName ? ` (max ${esc(state.records.bestFishName)} ${state.records.bestFishG} g)` : ''} · 🏀 miglior serie ${state.records.basketBest}/${S.BASKET.shots}</span>
    <span>Salvataggio</span><span>${readOnly ? 'SOLA LETTURA (versione più nuova o altra scheda): non salvo.' : storage ? 'in questo browser (localStorage). Cancellando i dati del sito lo perdi.' : 'NON disponibile: solo in memoria.'}</span></div>
@@ -611,7 +629,7 @@ function openMenu() {
    <h3>Comandi</h3><small>${matchMedia('(pointer:coarse)').matches ? 'Pollice sinistro: cammina (fino al bordo = corsa). Pollice destro: gira la visuale. Tasto in basso a destra: interagisci. In auto: ◀ ▶ a sinistra, Frena/Accelera a destra, D/R da fermi, Scendi in alto a sinistra.' : 'WASD/frecce, Shift corsa, trascina col mouse, rotella zoom, E interagisci, M mappa, Esc menu. In auto: W gas, S freno (tenuto da fermi = retromarcia), A/D sterzo, C ricentra, E scendi.'}</small>
    <div class="row"><button class="pill" id="mTut">Rivedi guida</button><button class="pill" id="mStuck">🧭 Sono bloccato</button>${document.fullscreenEnabled ? '<button class="pill" id="mFull">⛶ Schermo intero</button>' : ''}<button class="pill" id="mQual">🎚 Qualità: ${qualityPref === 'auto' ? `auto (${qualityTier})` : qualityTier}</button><button class="pill danger" id="mReset">Elimina progressi…</button></div>
    <h3>Crediti e licenze</h3><small>three.js (MIT). Personaggi: Quaternius (CC0). Texture e cielo: ambientCG, Poly Haven (CC0). Lampioni e cespugli: Poly Haven (CC0). Auto: Quaternius, RGS_Dev (CC0). Tegole, sabbia, mattoni, intonaco: Poly Haven (CC0). Volti, abiti, vetrine, alberi, insegne, mare e campanile: procedurali. Dettagli in README.md / LICENSES.md.</small><br>
-   <small>Prototipo v0.6.0 · mare nuotabile, grafica web più curata, pensata per il telefono. Auto e marchi inventati. iPhone reale non verificato.</small>`);
+   <small>Prototipo v0.7.0 · giorno e notte, case da comprare, lavori con paga giornaliera, frecce dell'auto. Crediti di gioco senza valore reale; auto, agenzie e marchi inventati. iPhone reale non verificato.</small>`);
   $('mResume').onclick = () => closeAll();
   $('mSave').onclick = () => { state.player = playerPose(); toast(saveNow() ? 'Salvato in questo browser.' : 'Salvataggio non riuscito.'); };
   $('mMirror').onclick = () => { paused = false; openMirror(); };
@@ -1003,7 +1021,7 @@ function gameAction() {
 // ---------- Loop ----------
 const clock = new THREE.Clock();
 const tmpV = new THREE.Vector3(), camTarget = new THREE.Vector3(), camPos = new THREE.Vector3(), headPos = new THREE.Vector3(), camTargetSm = new THREE.Vector3();
-let settleTimer = 0, saveTimer = 0, hudTimer = 0, miniTimer = 0, fpsAcc = 0, fpsN = 0, lowFps = 0, camInit = false;
+let dnTimer = 1, settleTimer = 0, saveTimer = 0, hudTimer = 0, miniTimer = 0, fpsAcc = 0, fpsN = 0, lowFps = 0, camInit = false;
 let groundY = 0.12;
 function playerPose() { if (driving) return { ...footPose }; const p = player.root.position; const wet = depthAt(p.x, p.z) > 0.3; // mai salvare in acqua (Guard/Nexus): si riparte sulla battigia
   return { x: +p.x.toFixed(3), z: +(wet ? SEA.shoreZ : p.z).toFixed(3), yaw: +player.root.rotation.y.toFixed(3) }; }
@@ -1036,6 +1054,9 @@ function loop() {
     if (run.gate !== g0) { toast(run.gate >= A.COURIER.gates.length ? 'Ultimo cancello! Ora al Belvedere: accosta e scendi.' : `Cancello ${run.gate}/3 ✓`); markDirty(); }
   }
   WATER_TIME.value = t;
+  // v0.7: orologio di gioco (salvato). Avanza solo con la pagina visibile e senza pausa: mai Date.now per paghe e giorni.
+  if (!paused && !document.hidden) { const d0 = Life.gameDay(state.life); Life.tick(state.life, raw * 1000); if (Life.gameDay(state.life) !== d0) { toast(`☀️ Giorno ${Life.gameDay(state.life) + 1}: i turni di lavoro sono di nuovo aperti.`, 3500); markDirty(); } }
+  blinkUpdate(t);
   const moving = driving ? false : updatePlayer(dt);
   if (!moving && !sitting && !game && player.current && /Walk|Run/.test(player.current.getClip().name)) player.play('Idle');
   const gy = world.groundHeight(p.x, p.z); groundY += (gy - groundY) * Math.min(1, dt * 12); p.y = sitting ? 0.12 : groundY;
@@ -1118,7 +1139,10 @@ function loop() {
 
   settleTimer += dt; saveTimer += dt; hudTimer += dt; miniTimer += dt;
   if (settleTimer > 10) { settleTimer = 0; S.settleGrowth(state, Date.now()); if (!(uiOpen && viewMode === 'face')) player.setGrooming(S.visibleLengths(state)); }
-  if (saveTimer > 4) { saveTimer = 0; if (dirty) { state.player = playerPose(); saveNow(); } }
+  if (saveTimer > 4) { saveTimer = 0; markDirty(); if (dirty) { state.player = playerPose(); saveNow(); } }
+  dnTimer += dt; if (dnTimer > 0.25) { dnTimer = 0; dayNight(); }
+  if (driving || headSpot.intensity > 0) headlightFollow();
+  if (nightSkyObj && nightSkyObj.stars.visible) { nightSkyObj.stars.position.copy(camera.position); nightSkyObj.moon.position.copy(camera.position).addScaledVector(moonDir, 160); nightSkyObj.moon.lookAt(camera.position); }
   if (hudTimer > 0.25) { hudTimer = 0; if (!uiOpen) refreshHUD(); updateInteract(); document.body.classList.toggle('ui', !!uiOpen || !!sitting); document.body.classList.toggle('driving', driving); }
   if (miniTimer > 0.15) { miniTimer = 0; mapUI.drawMini($('mini')); if (uiOpen === 'map') mapUI.draw(); }
   { const Q = QUALITY[qualityTier]; world.cull(camera, Math.min(Q.far, FOG_FAR + 10), Q.detail); }
@@ -1127,6 +1151,171 @@ function loop() {
   gateBeaconUpdate(t);
   renderer.render(scene, camera);
 }
+// ======================= v0.7: GIORNO E NOTTE =======================
+// Un giorno di gioco = 10 minuti (5 dal giorno alla notte, 5 dalla notte al giorno). Nessuna luce vera in più per lampioni e finestre:
+// tutto con l'emissivo (uniform NIGHT). Unica luce aggiunta: il faro dell'auto guidata, creato all'avvio (niente ricompilazioni).
+const DN = { day: new THREE.Color('#ffe8cc'), dusk: new THREE.Color('#ff9a5c'), moon: new THREE.Color('#9fb4ff'),
+  hemiDay: new THREE.Color('#d6e4f0'), hemiNight: new THREE.Color('#2a3a5a'), fogDay: new THREE.Color('#c9d3d8'), fogDusk: new THREE.Color('#e7b999'), fogNight: new THREE.Color('#1f2a38') };
+const tmpC = new THREE.Color(); const moonDir = new THREE.Vector3(0, 1, 0);
+let nightSkyObj = null, pools = null, dnLast = -1;
+const headSpot = new THREE.SpotLight('#fff1d6', 0, 34, 0.55, 0.55, 1.4); headSpot.castShadow = false; scene.add(headSpot); scene.add(headSpot.target);
+const envMats = new Map();
+function collectEnvMats() { scene.traverse((o) => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; for (const m of ms) if (m && 'envMapIntensity' in m && !envMats.has(m)) envMats.set(m, m.envMapIntensity); }); }
+function setupNight() {
+  collectEnvMats(); setTimeout(collectEnvMats, 4000); // anche auto e PNG caricati dopo
+  nightSkyObj = nightSky(); scene.add(nightSkyObj.stars); scene.add(nightSkyObj.moon);
+  pools = lightPools(world.lampAll || []); scene.add(pools);
+  dayNight(true);
+}
+function dayNight(force = false) {
+  const L = state.life; const h = Life.gameHour(L); const d = Life.daylight(L);
+  dnLast = d;
+  const tw = 4 * d * (1 - d); // picco al tramonto/alba
+  const night = THREE.MathUtils.clamp(1 - d * 1.6, 0, 1);
+  NIGHT.value = night;
+  // sole (6→18) o luna (18→6): arco da est a ovest
+  const isDay = h >= 5.5 && h < 18.5; const ph = isDay ? (h - 6) / 12 : (((h - 18) + 24) % 24) / 12;
+  const az = THREE.MathUtils.clamp(ph, -0.05, 1.05) * Math.PI;
+  SUN_DIR.set(Math.cos(az) * 0.85, Math.max(0.22, Math.sin(az)), 0.42).normalize();
+  moonDir.set(-Math.cos(az) * 0.6, Math.max(0.25, Math.sin(az) * 0.8), -0.55).normalize(); if (isDay) moonDir.set(0, -1, 0);
+  tmpC.copy(DN.moon).lerp(DN.day, d).lerp(DN.dusk, tw * 0.65); sun.color.copy(tmpC); sun.intensity = 0.35 + 2.65 * d;
+  hemi.color.copy(DN.hemiNight).lerp(DN.hemiDay, d); hemi.intensity = 0.12 + 0.13 * d;
+  if (scene.environment && !fxUnder) scene.backgroundIntensity = 0.06 + 0.94 * d;
+  const envK = 0.15 + 0.85 * d; // three r160: niente scene.environmentIntensity → scala l'envMapIntensity di ogni materiale (base salvata)
+  if (Math.abs(envK - (dayNight.envK ?? -1)) > 0.01 || force) { dayNight.envK = envK; for (const [m, base] of envMats) m.envMapIntensity = base * envK; }
+  renderer.toneMappingExposure = 0.9 + 0.1 * d;
+  FOG0.color.copy(DN.fogNight).lerp(DN.fogDay, d).lerp(DN.fogDusk, tw * 0.55);
+  if (!fxUnder) scene.fog.color.copy(FOG0.color); // sott'acqua resta la nebbia verde; tornando su si riprende il ciclo
+  for (const m of world.lampGlass || []) m.emissiveIntensity = 2.6 * night;
+  if (world.villaGlass) world.villaGlass.emissiveIntensity = 1.3 * night; if (world.villaPool) world.villaPool.emissiveIntensity = 0.9 * night;
+  if (world.nightShop) world.nightShop.emissiveIntensity = 0.34 + 0.6 * night;
+  if (pools) { pools.visible = night > 0.02; pools.material.opacity = 0.6 * night; }
+  if (nightSkyObj) { const sv = night > 0.05; nightSkyObj.stars.visible = sv; nightSkyObj.moon.visible = sv && !isDay; nightSkyObj.stars.material.opacity = night; nightSkyObj.moon.material.opacity = Math.min(1, night * 1.3); }
+  headSpot.intensity = driving && night > 0.05 ? 60 * night : 0;
+  if (carMesh && carMesh.userData.lights) carMesh.userData.lights.material.color.setScalar(1 + 0.8 * night); // fari e fanali più vivi di notte
+}
+const hsFwd = new THREE.Vector3();
+function headlightFollow() {
+  const c = car || parked; if (!c) return; hsFwd.set(Math.sin(c.yaw), 0, Math.cos(c.yaw));
+  const y = world.groundHeight(c.x, c.z);
+  headSpot.position.set(c.x + hsFwd.x * (c.spec.len / 2), y + 0.75, c.z + hsFwd.z * (c.spec.len / 2));
+  headSpot.target.position.set(c.x + hsFwd.x * 16, y, c.z + hsFwd.z * 16);
+}
+
+// ======================= v0.7: CASE =======================
+function houseCard(hid, inAgency = true) {
+  const h = Life.HOUSES[hid]; const H = state.life.homes; const own = H.owned.includes(hid); const main = H.main === hid;
+  const after = state.money - h.price;
+  const st = own ? (main ? '<b class="ok">Casa principale</b>' : '<b class="ok">Tua</b>') : after >= 0 ? `dopo l'acquisto: ${cr(after)} cr` : `<b class="no">mancano ${cr(-after)} cr</b>`;
+  return `<div class="house ${own ? 'own' : ''}"><div class="hh"><b>${esc(h.name)}</b><span>${esc(h.kind)} · ${esc(h.zone)} · ${h.rooms} ${h.rooms === 1 ? 'stanza' : 'stanze'}</span></div>
+    <small>${esc(h.desc)}</small><div class="hp"><span class="price">${cr(h.price)} cr</span><span>${st}</span></div>
+    <div class="row">${own ? (main ? '' : `<button class="pill" data-main="${hid}">Rendila principale</button>`) + (H.owned.length > 1 ? `<button class="pill" data-sell="${hid}">Vendi · ${cr(Math.floor(h.price * Life.RESALE))} cr</button>` : '')
+      : `<button class="pill primary" data-buy="${hid}" ${after < 0 ? 'disabled' : ''}>Compra · ${cr(h.price)} cr</button>`}${inAgency ? `<button class="pill" data-go="${hid}">◆ Sulla mappa</button>` : ''}</div></div>`;
+}
+function bindHouseButtons(back) {
+  const body = $('panelBody');
+  body.querySelectorAll('[data-buy]').forEach((b) => b.onclick = () => buyHouseFlow(b.dataset.buy, back));
+  body.querySelectorAll('[data-main]').forEach((b) => b.onclick = () => { Life.setMainHome(state, b.dataset.main); saveNow(); toast(`Casa principale: ${Life.HOUSES[b.dataset.main].name}. Qui ti risvegli e riparti.`); back(); });
+  body.querySelectorAll('[data-sell]').forEach((b) => b.onclick = () => { const id = b.dataset.sell; const h = Life.HOUSES[id];
+    confirmBox(`Vendere ${h.name} per ${cr(Math.floor(h.price * Life.RESALE))} crediti di gioco (70% del prezzo)?`, 'Vendi', () => { const r = Life.sellHouse(state, id); if (!r.ok) return toast(r.reason); world.setHouseSigns(state.life.homes.owned); saveNow(); refreshHUD(); toast(`Venduta: +${cr(r.pay)} crediti.`); back(); }); });
+  body.querySelectorAll('[data-go]').forEach((b) => b.onclick = () => { const h = Life.HOUSES[b.dataset.go]; houseWaypoint(b.dataset.go, h); closeAll(); toast(`◆ ${h.name} segnata sulla mappa.`); });
+}
+function houseWaypoint(id, h) { PLACES['house_' + id] = PLACES['house_' + id] || { id: 'house_' + id, name: h.name, short: h.name, icon: '🏠', x: h.door.x, z: h.door.z, door: h.door, color: '#9fd3c7' }; state.waypoint = 'house_' + id; markDirty(); }
+function buyHouseFlow(id, back) {
+  const h = Life.HOUSES[id]; const after = state.money - h.price;
+  if (after < 0) return toast(`Ti mancano ${cr(-after)} crediti. Un turno di lavoro al giorno aiuta.`);
+  confirmBox(`Comprare ${h.name} per ${cr(h.price)} crediti di gioco? Saldo: ${cr(state.money)} → ${cr(after)}. Diventa la tua casa principale: ti risvegli qui. Crediti finti, senza valore reale.`, `Compra · ${cr(h.price)} cr`, () => {
+    const r = Life.buyHouse(state, id); if (!r.ok) return toast(r.reason);
+    world.setHouseSigns(state.life.homes.owned); saveNow(); refreshHUD(); updateInteract();
+    toast(`🔑 ${h.name} è tua! −${cr(r.price)} crediti. Ora è la tua casa principale.`, 4200); back();
+  });
+}
+function openAgency() {
+  const H = state.life.homes;
+  openPanel(`<h2>🏠 Immobiliare Faro & Mare</h2>
+    <div class="say">«Buongiorno! Dalla soffitta alla villa coi limoni: qui c'è tutto il rione. Prezzi in crediti di gioco, chiavi subito.»</div>
+    <div class="stat"><span>Saldo</span><span>${cr(state.money)} crediti</span><span>Casa principale</span><span>${esc(Life.HOUSES[H.main].name)}</span></div>
+    <div class="houses">${Life.HOUSE_IDS.map((id) => houseCard(id)).join('')}</div>
+    <small>Comprare sposta la tua casa principale (dove ti risvegli). Rivendita al 70%. Crediti di gioco, senza valore reale. Agenzia e indirizzi inventati.</small>
+    <div class="row"><button class="pill" id="agClose">Chiudi</button></div>`);
+  bindHouseButtons(openAgency); $('agClose').onclick = closeAll;
+}
+function openHouse(id) {
+  const h = Life.HOUSES[id]; const own = state.life.homes.owned.includes(id); const night = Life.isNight(state.life);
+  openPanel(`<h2>${own ? '🏠' : '🏷'} ${esc(h.name)}</h2>
+    ${houseCard(id, false)}
+    ${own ? `<div class="stat"><span>Ora</span><span>${Life.clockLabel(state.life)}</span><span>Riposo</span><span>${night ? 'Puoi dormire fino alle 7:00.' : 'Si dorme dalle 20:00 alle 6:00.'}</span></div>
+    <div class="row"><button class="pill primary" id="hSleep" ${night ? '' : 'disabled'}>🛏 Dormi fino alle 7:00</button></div>` : '<small>Per comprarla puoi anche passare dall\'Immobiliare Faro & Mare in piazza.</small>'}
+    <div class="row"><button class="pill" id="hClose">Chiudi</button></div>`);
+  bindHouseButtons(() => openHouse(id)); $('hClose').onclick = closeAll;
+  if ($('hSleep')) $('hSleep').onclick = () => { const r = Life.sleep(state, id); if (!r.ok) return toast(r.reason);
+    state.life.homes.wakeAtHome = false; const sp = Life.homeSpot(state); player.root.position.set(sp.x, world.groundHeight(sp.x, sp.z), sp.z); player.root.rotation.y = sp.yaw; cam.yaw = cam.sYaw = sp.yaw + Math.PI; camInit = false;
+    state.player = playerPose(); dayNight(true); saveNow(); closeAll(); toast(`🌅 Buongiorno! Giorno ${r.day + 1}, ore 7:00.`, 3500); };
+}
+
+// ======================= v0.7: LAVORI =======================
+const TASKS = {
+  barbiere: [{ t: 'Sfuma la nuca', k: 'bar' }, { t: 'Che attrezzo per rifinire la barba?', k: 'pick', opts: ['Rasoio a mano libera', 'Phon', 'Pettine da pesca'], ok: 0 }, { t: 'Disegna la riga laterale', k: 'bar' }],
+  barista: [{ t: 'Monta il latte del cappuccino', k: 'bar' }, { t: 'Il signore vuole un caffè «macchiato freddo». Cosa aggiungi?', k: 'pick', opts: ['Panna montata', 'Una goccia di latte freddo', 'Acqua tonica'], ok: 1 }, { t: 'Estrai l\'espresso: ferma al momento giusto', k: 'bar' }],
+  bagnino: [{ t: 'Apri gli ombrelloni in fila', k: 'bar' }, { t: 'Bandiera rossa sul pennone: cosa vuol dire?', k: 'pick', opts: ['Bagno vietato', 'Mare calmo', 'Gelati gratis'], ok: 0 }, { t: 'Rastrella la battigia', k: 'bar' }],
+  meccanico: [{ t: 'Serra i bulloni della ruota a croce', k: 'bar' }, { t: 'Spia dell\'olio accesa: cosa controlli?', k: 'pick', opts: ['L\'autoradio', 'Il livello dell\'olio', 'I tergicristalli'], ok: 1 }, { t: 'Gonfia le gomme alla pressione giusta', k: 'bar' }],
+};
+const JOB_TALK = { barbiere: 'tonino', barista: 'marta', bagnino: 'pina', meccanico: 'gino' };
+function addJobButton(id) {
+  const j = Life.JOBS[id]; const mine = state.life.work.job === id; const st = mine && Life.shiftStatus(state, id);
+  const b = document.createElement('button'); b.className = 'pill job'; b.id = 'jobBtn';
+  b.textContent = `💼 Lavoro da ${j.name.toLowerCase()}${mine ? (st.can ? ' · turno disponibile' : st.done ? ' · fatto per oggi' : '') : ` · ${cr(Life.wageFor(state.life, id))} cr al giorno`}`;
+  b.onclick = () => openJob(id); const body = $('panelBody'); const t = $('pTalk'); if (t) t.after(b); else body.prepend(b);
+}
+function openJob(id) {
+  const j = Life.JOBS[id]; const L = state.life; const mine = L.work.job === id; const can = Life.canTake(L, id); const st = Life.shiftStatus(state, id);
+  const n = L.work.shifts[id] || 0; const wage = Life.wageFor(L, id);
+  const last = L.work.payslips.filter((p) => p.job === id).slice(-3).reverse().map((p) => `Giorno ${p.day + 1}: +${cr(p.pay)} cr (paga ${cr(p.base)} + mancia ${cr(p.tip)})`).join('<br>');
+  openPanel(`<h2>${j.icon} ${esc(j.name)} · ${esc(j.place)}</h2>
+    <div class="say">${mine ? `«Eccoti. ${st.can ? 'Tre lavoretti e la giornata è pagata.' : st.done ? 'Per oggi basta così: ci vediamo domani.' : 'Adesso siamo chiusi.'}»` : '«Cerchiamo una mano: turno breve, tre compiti, paga a fine giornata.»'} <small>— ${esc(j.boss)}</small></div>
+    <div class="stat"><span>Paga</span><span>${cr(wage)} crediti per giornata di gioco + mancia fino al 20%${n >= 5 ? ' · anzianità inclusa' : ''}</span>
+    <span>Orario</span><span>${j.from}:00–${j.to}:00 · ora: ${Life.clockLabel(L)}</span>
+    <span>Regola</span><span>un turno pagato al giorno (in tutto). Il giorno dura 10 minuti.</span>
+    <span>Turni fatti</span><span>${n}${n < 5 ? ' (dal 5° +10%, dal 12° +20%)' : ''}</span></div>
+    ${last ? `<h3>Buste paga</h3><small>${last}</small>` : ''}
+    <div class="row">${mine ? `<button class="pill primary" id="jStart" ${st.can ? '' : 'disabled'}>▶ Inizia il turno</button><button class="pill" id="jQuit">Licenziati</button>`
+      : `<button class="pill primary" id="jTake" ${can.ok ? '' : 'disabled'}>Accetta il lavoro</button>`}<button class="pill" id="jClose">Chiudi</button></div>
+    ${!mine && !can.ok ? `<small>${esc(can.reason)}</small>` : ''}${mine && !st.can ? `<small>${esc(st.reason)}</small>` : ''}
+    ${!mine && L.work.job ? `<small>Ora lavori da ${esc(Life.JOBS[L.work.job].name.toLowerCase())}: accettando cambi lavoro.</small>` : ''}
+    <small>Crediti di gioco, senza valore reale.</small>`, { talk: JOB_TALK[id] });
+  if ($('jTake')) $('jTake').onclick = () => { const r = Life.takeJob(state, id); if (!r.ok) return toast(r.reason); saveNow(); toast(`Assunto come ${j.name.toLowerCase()}!`); openJob(id); };
+  if ($('jQuit')) $('jQuit').onclick = () => confirmBox(`Lasciare il lavoro da ${j.name.toLowerCase()}? I turni fatti restano.`, 'Licenziati', () => { Life.quitJob(state); saveNow(); openJob(id); });
+  if ($('jStart')) $('jStart').onclick = () => { const r = Life.startShift(state, id); if (!r.ok) return toast(r.reason); markDirty(); runTask(id); };
+  $('jClose').onclick = closeAll;
+}
+let taskTimer = null;
+function runTask(id) {
+  const s = state.life.work.shift; if (!s) return openJob(id);
+  const task = TASKS[id][s.done % TASKS[id].length]; const j = Life.JOBS[id];
+  clearInterval(taskTimer);
+  const head = `<h2>${j.icon} Turno · compito ${s.done + 1}/${Life.TASKS_PER_SHIFT}</h2><div class="say">${esc(task.t)}</div>`;
+  if (task.k === 'pick') {
+    openPanel(`${head}<div class="opts">${task.opts.map((o, i) => `<button data-o="${i}">${esc(o)}</button>`).join('')}</div><small>Ogni compito fa passare un'ora di gioco.</small>`, { talk: null });
+    $('panelBody').querySelectorAll('[data-o]').forEach((b) => b.onclick = () => taskDone(id, +b.dataset.o === task.ok ? 1 : 0.25, +b.dataset.o === task.ok ? 'Giusto!' : 'Mmh, non proprio.'));
+    return;
+  }
+  openPanel(`${head}<div class="jbar"><div class="zone"></div><div class="mk" id="tMk"></div></div>
+    <div class="row"><button class="pill primary big" id="tGo">✋ Ora!</button></div><small>Ferma il cursore nella zona verde: più sei preciso, più mancia.</small>`, { talk: null });
+  const t0 = performance.now(); let pos = 0;
+  taskTimer = setInterval(() => { pos = 0.5 - 0.5 * Math.cos((performance.now() - t0) / 1000 * 2.4); const mk = $('tMk'); if (mk) mk.style.left = `${(pos * 100).toFixed(1)}%`; else clearInterval(taskTimer); }, 30);
+  $('tGo').onclick = () => { clearInterval(taskTimer); const q = taskForced ?? Math.max(0, 1 - Math.abs(pos - 0.5) / 0.22); taskForced = null; taskDone(id, q, q > 0.8 ? 'Perfetto!' : q > 0.4 ? 'Buono.' : 'Così così.'); };
+}
+let taskForced = null;
+function taskDone(id, q, msg) {
+  const r = Life.finishTask(state, q); markDirty();
+  if (!r.ok) { saveNow(); toast(r.reason); return openJob(id); }
+  if (!r.paid) { toast(`${msg} ${r.done}/${Life.TASKS_PER_SHIFT}`, 1300); return runTask(id); }
+  saveNow(); refreshHUD();
+  openPanel(`<h2>💶 Busta paga · Giorno ${r.day + 1}</h2><div class="stat"><span>Lavoro</span><span>${esc(Life.JOBS[id].name)}</span><span>Paga</span><span>${cr(r.base)} crediti</span><span>Mancia</span><span>${cr(r.tip)} crediti</span><span>Totale</span><span><b>+${cr(r.pay)} crediti</b></span><span>Saldo</span><span>${cr(state.money)} crediti</span></div>
+    <small>Il prossimo turno pagato è domani (giorno ${r.day + 2}). Crediti di gioco, senza valore reale.</small><div class="row"><button class="pill primary" id="pOk">Grazie!</button></div>`);
+  $('pOk').onclick = closeAll; toast(`${msg} Turno finito: +${cr(r.pay)} crediti.`, 3000);
+}
+
 // ---------- v0.6: a piedi, in acqua bassa e a nuoto ----------
 // Profondità = livello del mare − fondale (stessa funzione usata dalla mesh). Solo davanti alla Spiaggia di Ponente.
 function depthAt(x, z) { return inSwimX(x) && z < -168 ? Math.max(0, SEA.y - world.groundHeight(x, z)) : 0; }
@@ -1139,7 +1328,7 @@ function underwaterFx() {
   const c = camera.position; const under = c.y < SEA.y - 0.05 && inSwimX(c.x) && c.z < -178.5;
   if (under === fxUnder) return; fxUnder = under; document.body.classList.toggle('under', under);
   if (under) { bg0 = scene.background; scene.fog.color.set('#1e5a63'); scene.fog.near = 1; scene.fog.far = 24; scene.background = scene.fog.color; }
-  else { scene.fog.color.copy(FOG0.color); scene.fog.near = FOG0.near; scene.fog.far = FOG0.far; scene.background = bg0; }
+  else { scene.fog.color.copy(FOG0.color); scene.fog.near = FOG0.near; scene.fog.far = FOG0.far; scene.background = bg0; dayNight(true); } // v0.7 (Cranc): FOG0 segue giorno e notte
 }
 function updatePlayer(dt) {
   const p = player.root.position;
@@ -1162,7 +1351,8 @@ function updatePlayer(dt) {
       // boe: oltre si viene spinti dolcemente verso riva (mai un muro secco, mai pericolo)
       if (p.z < SEA.buoyZ + 4) { swim.vz += (SEA.buoyZ + 4 - p.z) * 0.9 * dt; if (!swim.told.buoy) { swim.told.buoy = 1; toast('Le boe segnano il limite. Da qui si torna verso riva.'); } }
       else if (p.z > SEA.buoyZ + 12) swim.told.buoy = 0;
-      const x0 = p.x, z0 = p.z; p.x += swim.vx * dt; p.z += swim.vz * dt; world.resolve(p, 0.4, SEA.y - 0.2);
+      if (swim.style === 'sott' && depth < 1.6) { swim.style = swim.prevStyle && swim.prevStyle !== 'sott' ? swim.prevStyle : 'rana'; toast('Troppo basso: risali.', 1400); updateSwimUI(); } // v0.7 (Cranc)
+      const x0 = p.x, z0 = p.z; p.x += swim.vx * dt; p.z += swim.vz * dt; world.resolve(p, 0.4, p.y + HIP - 0.35); // v0.7: i sassi sommersi bloccano chi nuota alla loro altezza
       const moved = Math.hypot(p.x - x0, p.z - z0);
       if (mag > 0.12) { let dy = ang - player.root.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); player.root.rotation.y += dy * Math.min(1, dt * 3); }
       const cps = (mag > 0.12 ? SWIM[swim.style] : SWIM.fermo).cps * (0.7 + 0.5 * Math.min(1, moved / Math.max(dt, 1e-4) / 1.2));
@@ -1203,7 +1393,7 @@ function onWaterChange(a, b) {
     if (!state.jobs.swimHint) { state.jobs.swimHint = true; markDirty(); toast('Sei in acqua: muovi lo stick per nuotare. Cambia stile col tasto a destra.', 6000); }
     else toast(`Stile: ${SWIM[swim.style].name}`);
   }
-  if (a === 'swim' && b !== 'swim') { swim.dive = false; }
+  if (a === 'swim' && b !== 'swim') { swim.dive = false; if (swim.style === 'sott') swim.style = swim.prevStyle && swim.prevStyle !== 'sott' ? swim.prevStyle : 'rana'; } // v0.7 (Cranc): a riva non si resta «in immersione»
   if (b === 'walk' && a !== 'walk') toast('Di nuovo a terra.', 1600);
   updateSwimUI();
 }
@@ -1259,7 +1449,7 @@ function walkNPC(n, dt) {
 let driving = false, car = null, carMesh = null, parked = null, footPose = { ...state.player };
 const carMeshes = {}; // id → Group (riutilizzati)
 const parkedCircles = [0, 1, 2].map(() => ({ x: 1e6, z: 1e6, r: 0.1 }));
-const drv = { steerL: 0, steerR: 0, gas: 0, brake: 0, gearR: false, kbStopT: 0, lookT: -10, warnT: 0 };
+const drv = { steerL: 0, steerR: 0, gas: 0, brake: 0, gearR: false, kbStopT: 0, lookT: -10, warnT: 0, blink: null, turned: 0, straightT: 0 };
 const OUT = { x: 1e6, z: 1e6 };
 function carColor(id) { return (state.garage.paint && state.garage.paint[id]) || S.CARS[id].color; }
 function carMeshFor(id) {
@@ -1332,6 +1522,7 @@ function leaveCar(x, z, silent = false) {
   car.vx = car.vz = 0; car.steer = 0;
   state.garage.car = { x: +car.x.toFixed(2), z: +car.z.toFixed(2), yaw: +car.yaw.toFixed(3) };
   parked = car; car = null; driving = false;
+  if (drv.blink !== 'H') drv.blink = null; // le quattro frecce restano accese da parcheggiati, le frecce no
   carCircles(parked).forEach((c, i) => Object.assign(parkedCircles[i], c));
   player.root.visible = true; player.root.position.set(x, world.groundHeight(x, z), z);
   player.root.rotation.y = Math.atan2(x - parked.x, z - parked.z); player.play('Idle');
@@ -1382,6 +1573,12 @@ function updateDriving(dt) {
   const p = player.root.position; p.x = car.x; p.z = car.z; player.root.rotation.y = car.yaw;
   const v = fwdSpeed(car); const roll = THREE.MathUtils.clamp(-car.steer * v * Math.abs(v) * 0.0009, -0.05, 0.05);
   setWheels(carMesh, car.wheelRot, car.steer, roll);
+  // v0.7: la freccia si spegne da sola dopo una svolta (>60°) quando lo sterzo torna dritto, come su un'auto vera
+  if (drv.blink === 'L' || drv.blink === 'R') {
+    const dy = Math.atan2(Math.sin(car.yaw - (drv.yaw0 ?? car.yaw)), Math.cos(car.yaw - (drv.yaw0 ?? car.yaw))); drv.yaw0 = car.yaw; drv.turned += Math.abs(dy);
+    drv.straightT = Math.abs(car.steer) < 0.08 ? drv.straightT + dt : 0;
+    if (drv.turned > Math.PI / 3 && drv.straightT > 0.3) { drv.blink = null; updateDriveUI(); }
+  }
   if (car.stuckT > 2.2) $('unstuck').classList.remove('hidden');
   if (car.autoBrake && Math.abs(v) > 1.5 && clock.elapsedTime - drv.warnT > 3.5) { drv.warnT = clock.elapsedTime; toast('Frenata automatica: c\'è qualcuno davanti.', 1800); }
   markDirty(); updateDriveUI();
@@ -1390,7 +1587,8 @@ function updateDriveUI() {
   if (!car) return; const v = fwdSpeed(car); const stopped = Math.abs(v) < 1;
   const k = kmh(car); const run = state.jobs && state.jobs.courier;
   const lim = run && !run.spoiled ? `<span class="lim ${k > A.COURIER_KMH ? 'over' : k > A.COURIER_KMH - 5 ? 'near' : ''}">36</span>` : '';
-  $('speedo').innerHTML = `<b>${k}</b> km/h <span class="gear ${drv.gearR ? 'r' : ''}">${drv.gearR ? 'R' : 'D'}</span>${lim}`;
+  $('speedo').innerHTML = `<i class="ind l ${drv.blink === 'L' || drv.blink === 'H' ? 'act' : ''}">◀</i><b>${k}</b> km/h <span class="gear ${drv.gearR ? 'r' : ''}">${drv.gearR ? 'R' : 'D'}</span>${lim}<i class="ind r ${drv.blink === 'R' || drv.blink === 'H' ? 'act' : ''}">▶</i>`;
+  $('dBlinkL').classList.toggle('on', drv.blink === 'L'); $('dBlinkR').classList.toggle('on', drv.blink === 'R'); $('dHazard').classList.toggle('on', drv.blink === 'H');
   $('speedo').classList.toggle('over', !!(run && !run.spoiled && k > A.COURIER_KMH));
   const g = $('dGear'); g.textContent = drv.gearR ? 'R → D' : 'D → R'; g.disabled = !stopped; g.classList.toggle('dim', !stopped);
 }
@@ -1426,6 +1624,19 @@ holdBtn('dGas', () => { drv.gas = 1; }, () => { drv.gas = 0; });
 holdBtn('dBrake', () => { drv.brake = 1; }, () => { drv.brake = 0; });
 $('dGear').onclick = () => { if (!car || Math.abs(fwdSpeed(car)) >= 1) return toast('Fermati per cambiare tra D e R.'); drv.gearR = !drv.gearR; updateDriveUI(); };
 $('dExit').onclick = () => tryExit();
+// v0.7 (Nexus): frecce su tasti propri sopra il tachimetro (◀ ▶ restano lo sterzo)
+function setBlinker(k) {
+  drv.blink = drv.blink === k ? null : k; drv.turned = 0; drv.straightT = 0; drv.yaw0 = car ? car.yaw : 0;
+  updateDriveUI(); if (!driving) return;
+  toast(drv.blink === 'H' ? '⚠ Quattro frecce accese' : drv.blink === 'L' ? '⬅ Freccia a sinistra' : drv.blink === 'R' ? '➡ Freccia a destra' : 'Frecce spente', 1100);
+}
+for (const [id, k] of [['dBlinkL', 'L'], ['dBlinkR', 'R'], ['dHazard', 'H']]) $(id).addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); setBlinker(k); });
+function blinkUpdate(t) {
+  if (!carMesh) return; const on = !!drv.blink; const ph = on && (t * 1.5) % 1 < 0.55 ? 1 : 0; // 1,5 lampeggi al secondo
+  setBlink(carMesh, ph && (drv.blink === 'L' || drv.blink === 'H') ? 1 : 0, ph && (drv.blink === 'R' || drv.blink === 'H') ? 1 : 0, on);
+  if (driving && on) { const lit = !!ph; if (lit !== blinkUpdate.lit) { blinkUpdate.lit = lit; document.body.classList.toggle('blinkOn', lit); } }
+  else if (blinkUpdate.lit) { blinkUpdate.lit = false; document.body.classList.remove('blinkOn'); }
+}
 $('dCam').onclick = () => recenter();
 $('unstuck').onclick = () => unstuck();
 $('cRetry').onclick = () => { if (A.courierRetry(state)) { if (state.jobs.courier) state.jobs.courier._told = false; saveNow(); refreshHUD(); toast('Rotta azzerata: ripassa dai 3 cancelli verdi, senza fretta.'); } };
@@ -1502,6 +1713,10 @@ if (TEST_HOOK) window.__vd = {
   setDrive(o) { Object.assign(drv, o); }, keys: input.keys,
   drive(sec, inp) { for (let t = 0; t < sec; t += 1 / 30) { stepCar(car, inp, 1 / 30, carWorld()); } const p = player.root.position; p.x = car.x; p.z = car.z; },
   pickShell, openGelato, openWash, rescueFoot, carInWash, get shells() { return A.shellsToday(state, Date.now()); }, shellMeshes, A, refreshHUD, updateDriveUI, get status() { return status; },
+  // v0.7
+  Life, NIGHT, dayNight, openAgency, openHouse, openJob, runTask, setBlinker, get blink() { return drv.blink; }, get topup() { return topup; },
+  forceTask(q) { taskForced = q; }, taskDone, setHour(h) { const L = state.life; L.clock.gameMs = Life.gameDay(L) * Life.DAY_LEN_MS + h * Life.HOUR_MS; dayNight(true); refreshHUD(); },
+  get headSpot() { return headSpot.intensity; }, get pools() { return pools && pools.visible; }, get stars() { return nightSkyObj && nightSkyObj.stars.visible; },
   placeCar(x, z, yaw) { const c = car || parked; Object.assign(c, { x, z, yaw, vx: 0, vz: 0 }); if (!driving) placeParkedAt(x, z, yaw); },
 };
 
